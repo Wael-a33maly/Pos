@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Edit, Trash2, MoreHorizontal, Package, Filter, Download, Upload, QrCode, Eye, Copy, ChevronDown, ChevronUp, X, Sparkles, TrendingUp, AlertCircle, Barcode
@@ -419,13 +419,9 @@ export function ProductsPage() {
                       const isExpanded = expandedVariants.includes(product.id);
                       
                       return (
-                        <motion.Fragment key={product.id}>
-                          <motion.TableRow 
+                        <Fragment key={product.id}>
+                          <TableRow 
                             className="cursor-pointer hover:bg-muted/30 transition-colors"
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            transition={{ delay: index * 0.03 }}
                             onClick={() => toggleVariants(product.id)}
                           >
                             <TableCell>
@@ -512,7 +508,7 @@ export function ProductsPage() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>
-                          </motion.TableRow>
+                          </TableRow>
                           
                           {/* Variants Row */}
                           <AnimatePresence>
@@ -552,7 +548,7 @@ export function ProductsPage() {
                               </motion.tr>
                             )}
                           </AnimatePresence>
-                        </motion.Fragment>
+                        </Fragment>
                       );
                     })}
                   </AnimatePresence>

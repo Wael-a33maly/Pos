@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   keywords: ["POS", "نقاط البيع", "مبيعات", "مخزون", "فواتير"],
   authors: [{ name: "POS System Team" }],
   icons: {
-    icon: "/favicon.ico",
+    icon: "/icons/icon-192x192.svg",
   },
   manifest: "/manifest.json",
 };
@@ -52,8 +52,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" 
           rel="stylesheet" 
         />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body

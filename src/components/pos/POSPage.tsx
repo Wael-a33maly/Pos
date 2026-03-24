@@ -1576,6 +1576,9 @@ export function POSPage() {
               <Wallet className="h-5 w-5 text-amber-500" />
               إضافة مصروف
             </DialogTitle>
+            <DialogDescription>
+              أدخل تفاصيل المصروف الجديد
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -1648,6 +1651,9 @@ export function POSPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>تفاصيل الوردية</DialogTitle>
+            <DialogDescription>
+              ملخص مبيعات الوردية الحالية
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -1693,6 +1699,9 @@ export function POSPage() {
               <UserPlus className="h-5 w-5" />
               إضافة عميل جديد
             </DialogTitle>
+            <DialogDescription>
+              أدخل بيانات العميل الجديد
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">

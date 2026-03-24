@@ -708,19 +708,15 @@ export function ReportsPage() {
                       <AnimatePresence mode="popLayout">
                         {table.getRowModel().rows?.length ? (
                           table.getRowModel().rows.map((row, index) => (
-                            <motion.TableRow
+                            <TableRow
                               key={row.id}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: 20 }}
-                              transition={{ delay: index * 0.03 }}
                             >
                               {row.getVisibleCells().map(cell => (
                                 <TableCell key={cell.id}>
                                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                 </TableCell>
                               ))}
-                            </motion.TableRow>
+                            </TableRow>
                           ))
                         ) : (
                           <TableRow>

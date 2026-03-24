@@ -315,12 +315,8 @@ export function CustomersPage() {
                 <TableBody>
                   <AnimatePresence mode="popLayout">
                     {filteredCustomers.map((customer, index) => (
-                      <motion.TableRow
+                      <TableRow
                         key={customer.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 20 }}
-                        transition={{ delay: index * 0.03 }}
                         className="hover:bg-muted/30 transition-colors"
                       >
                         <TableCell>
@@ -378,7 +374,7 @@ export function CustomersPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
-                      </motion.TableRow>
+                      </TableRow>
                     ))}
                   </AnimatePresence>
                 </TableBody>

@@ -367,13 +367,9 @@ export function InvoicesPage() {
                       const StatusIcon = statusInfo.icon;
                       
                       return (
-                        <motion.TableRow
+                        <TableRow
                           key={invoice.id}
                           className="cursor-pointer hover:bg-muted/30 transition-colors"
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 20 }}
-                          transition={{ delay: index * 0.03 }}
                           onClick={() => viewInvoice(invoice)}
                         >
                           <TableCell>
@@ -453,7 +449,7 @@ export function InvoicesPage() {
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
-                        </motion.TableRow>
+                        </TableRow>
                       );
                     })}
                   </AnimatePresence>
