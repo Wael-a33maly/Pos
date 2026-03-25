@@ -6,7 +6,6 @@ import { Layout } from '@/components/layout/Layout';
 import { useAppStore } from '@/store';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Loading Skeleton Component
 function PageSkeleton() {
   return (
     <div className="p-6 space-y-6">
@@ -18,57 +17,56 @@ function PageSkeleton() {
         <Skeleton className="h-10 w-32" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} className="h-32" />
-        ))}
+        {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32" />)}
       </div>
       <Skeleton className="h-96" />
     </div>
   );
 }
 
-// Lazy loaded pages - تحميل عند الطلب
-const DashboardPage = lazy(() => import('@/components/dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
-// POS Module - استخدام الوحدة الجديدة
+// Dashboard Module
+const DashboardPage = lazy(() => import('@/modules/dashboard/components/DashboardPage').then(m => ({ default: m.DashboardPage })));
+// POS Module
 const POSPage = lazy(() => import('@/modules/pos/components/POSPage').then(m => ({ default: m.POSPage })));
-const ProductsPage = lazy(() => import('@/components/products/ProductsPage').then(m => ({ default: m.ProductsPage })));
-const CategoriesPage = lazy(() => import('@/components/products/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
-const BrandsPage = lazy(() => import('@/components/products/BrandsPage').then(m => ({ default: m.BrandsPage })));
-const BarcodePrintPage = lazy(() => import('@/components/products/BarcodePrintPage').then(m => ({ default: m.BarcodePrintPage })));
-const ImportProductsPage = lazy(() => import('@/components/products/ImportProductsPage').then(m => ({ default: m.ImportProductsPage })));
-const UsersPage = lazy(() => import('@/components/users/UsersPage').then(m => ({ default: m.UsersPage })));
-const UnifiedSettingsPage = lazy(() => import('@/components/settings/UnifiedSettingsPage').then(m => ({ default: m.UnifiedSettingsPage })));
-const CustomersPage = lazy(() => import('@/components/customers/CustomersPage').then(m => ({ default: m.CustomersPage })));
-const SuppliersPage = lazy(() => import('@/components/suppliers/SuppliersPage').then(m => ({ default: m.SuppliersPage })));
-const InvoicesPage = lazy(() => import('@/components/invoices/InvoicesPage').then(m => ({ default: m.InvoicesPage })));
-const ExpensesPage = lazy(() => import('@/components/expenses/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
-const ReportsPage = lazy(() => import('@/components/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
-const AccountsPage = lazy(() => import('@/components/accounts/AccountsPage').then(m => ({ default: m.AccountsPage })));
-const ShiftManagementPage = lazy(() => import('@/components/shifts/ShiftManagementPage').then(m => ({ default: m.ShiftManagementPage })));
-const AuditLogsPage = lazy(() => import('@/components/shifts/AuditLogsPage').then(m => ({ default: m.AuditLogsPage })));
-const LoginPage = lazy(() => import('@/components/auth/LoginPage').then(m => ({ default: m.LoginPage })));
+// Products Module
+const ProductsPage = lazy(() => import('@/modules/products/components/ProductsPage').then(m => ({ default: m.ProductsPage })));
+const CategoriesPage = lazy(() => import('@/modules/products/components/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
+const BrandsPage = lazy(() => import('@/modules/products/components/BrandsPage').then(m => ({ default: m.BrandsPage })));
+const BarcodePrintPage = lazy(() => import('@/modules/products/components/BarcodePrintPage').then(m => ({ default: m.BarcodePrintPage })));
+const ImportProductsPage = lazy(() => import('@/modules/products/components/ImportProductsPage').then(m => ({ default: m.ImportProductsPage })));
+// Customers Module
+const CustomersPage = lazy(() => import('@/modules/customers/components/CustomersPage').then(m => ({ default: m.CustomersPage })));
+// Invoices Module
+const InvoicesPage = lazy(() => import('@/modules/invoices/components/InvoicesPage').then(m => ({ default: m.InvoicesPage })));
+// Reports Module
+const ReportsPage = lazy(() => import('@/modules/reports/components/ReportsPage').then(m => ({ default: m.ReportsPage })));
+// Shifts Module
+const ShiftManagementPage = lazy(() => import('@/modules/shifts/components/ShiftManagementPage').then(m => ({ default: m.ShiftManagementPage })));
+const AuditLogsPage = lazy(() => import('@/modules/shifts/components/AuditLogsPage').then(m => ({ default: m.AuditLogsPage })));
+// Settings Module
+const UnifiedSettingsPage = lazy(() => import('@/modules/settings/components/UnifiedSettingsPage').then(m => ({ default: m.UnifiedSettingsPage })));
+// Auth Module
+const LoginPage = lazy(() => import('@/modules/auth/components/LoginPage').then(m => ({ default: m.LoginPage })));
+// Users Module
+const UsersPage = lazy(() => import('@/modules/users/components/UsersPage').then(m => ({ default: m.UsersPage })));
+// Suppliers Module
+const SuppliersPage = lazy(() => import('@/modules/suppliers/components/SuppliersPage').then(m => ({ default: m.SuppliersPage })));
+// Expenses Module
+const ExpensesPage = lazy(() => import('@/modules/expenses/components/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
+// Accounts Module
+const AccountsPage = lazy(() => import('@/modules/accounts/components/AccountsPage').then(m => ({ default: m.AccountsPage })));
 
-// Profile Page - صفحة خفيفة لا تحتاج lazy loading
 function ProfilePage() {
   const { user } = useAppStore();
-  
   return (
     <div className="p-6 max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">الملف الشخصي</h1>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center text-2xl font-bold">
-            {user?.name?.charAt(0) || 'U'}
-          </div>
+          <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center text-2xl font-bold">{user?.name?.charAt(0) || 'U'}</div>
           <div>
             <h2 className="text-xl font-semibold">{user?.name || 'المستخدم'}</h2>
             <p className="text-muted-foreground">{user?.email}</p>
-          </div>
-        </div>
-        <div className="grid gap-4">
-          <div className="p-4 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground">الدور</p>
-            <p className="font-medium">{user?.role === 'SUPER_ADMIN' ? 'سوبر مدير' : user?.role === 'BRANCH_ADMIN' ? 'مدير فرع' : 'مستخدم'}</p>
           </div>
         </div>
       </div>
@@ -76,29 +74,15 @@ function ProfilePage() {
   );
 }
 
-// Page mapping with lazy loading
 const PAGE_COMPONENTS: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
-  'users': UsersPage,
-  'roles': UsersPage,
-  'shifts': ShiftManagementPage,
-  'shift-close': ShiftManagementPage,
-  'shift-closures': ShiftManagementPage,
-  'audit-logs': AuditLogsPage,
-  'products': ProductsPage,
-  'categories': CategoriesPage,
-  'brands': BrandsPage,
-  'customers': CustomersPage,
-  'suppliers': SuppliersPage,
-  'supplier-companies': SuppliersPage,
-  'invoices': InvoicesPage,
-  'returns': InvoicesPage,
-  'expenses': ExpensesPage,
-  'expense-categories': ExpensesPage,
-  'accounts': AccountsPage,
-  'reports': ReportsPage,
-  'settings': UnifiedSettingsPage,
-  'barcode': BarcodePrintPage,
-  'import': ImportProductsPage,
+  'users': UsersPage, 'roles': UsersPage,
+  'shifts': ShiftManagementPage, 'shift-close': ShiftManagementPage, 'shift-closures': ShiftManagementPage, 'audit-logs': AuditLogsPage,
+  'products': ProductsPage, 'categories': CategoriesPage, 'brands': BrandsPage,
+  'customers': CustomersPage, 'suppliers': SuppliersPage, 'supplier-companies': SuppliersPage,
+  'invoices': InvoicesPage, 'returns': InvoicesPage,
+  'expenses': ExpensesPage, 'expense-categories': ExpensesPage,
+  'accounts': AccountsPage, 'reports': ReportsPage, 'settings': UnifiedSettingsPage,
+  'barcode': BarcodePrintPage, 'import': ImportProductsPage,
 };
 
 function PageContent() {
@@ -107,43 +91,17 @@ function PageContent() {
   const page = searchParams.get('page');
   const { setPosMode, isAuthenticated } = useAppStore();
 
-  useEffect(() => {
-    setPosMode(mode === 'pos');
-  }, [mode, setPosMode]);
+  useEffect(() => { setPosMode(mode === 'pos'); }, [mode, setPosMode]);
 
-  // تحديد الصفحة المطلوبة - useMemo لمنع إعادة الحساب
   const PageComponent = useMemo(() => {
-    // صفحة تسجيل الدخول
-    if (!isAuthenticated && page !== 'login') {
-      return LoginPage;
-    }
-    
-    if (page === 'login') {
-      return LoginPage;
-    }
-    
-    // وضع نقطة البيع
-    if (mode === 'pos') {
-      return POSPage;
-    }
-    
-    // صفحة الملف الشخصي
-    if (page === 'profile') {
-      return null; // سيتم التعامل معها بشكل خاص
-    }
-    
-    // الصفحات الأخرى
+    if (!isAuthenticated && page !== 'login') return LoginPage;
+    if (page === 'login') return LoginPage;
+    if (mode === 'pos') return POSPage;
+    if (page === 'profile') return null;
     return PAGE_COMPONENTS[page || ''] || DashboardPage;
   }, [isAuthenticated, page, mode]);
 
-  // في حالة صفحة الملف الشخصي
-  if (page === 'profile' && isAuthenticated) {
-    return (
-      <Layout>
-        <ProfilePage />
-      </Layout>
-    );
-  }
+  if (page === 'profile' && isAuthenticated) return <Layout><ProfilePage /></Layout>;
 
   return (
     <Layout>

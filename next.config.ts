@@ -1,16 +1,15 @@
 import type { NextConfig } from "next";
 
+// v1.3.1 - Force clean rebuild
 const nextConfig: NextConfig = {
   output: "standalone",
   
-  // تجاهل أخطاء TypeScript في البناء
   typescript: {
     ignoreBuildErrors: true,
   },
   
   reactStrictMode: false,
   
-  // تحسين استيراد الحزم الكبيرة
   experimental: {
     optimizePackageImports: [
       'lucide-react',
@@ -25,14 +24,12 @@ const nextConfig: NextConfig = {
     ],
   },
   
-  // تحسين الصور
   images: {
     formats: ['image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
   
-  // Headers للتخزين المؤقت
   async headers() {
     return [
       {
@@ -49,9 +46,6 @@ const nextConfig: NextConfig = {
       }
     ]
   },
-  
-  // Turbopack config (فارغ للسماح بالعمل)
-  turbopack: {},
 };
 
 export default nextConfig;

@@ -46,7 +46,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAppStore } from '@/store';
 import { cn } from '@/lib/utils';
-import { OpenShiftDialog } from '@/components/shifts/OpenShiftDialog';
+import { OpenShiftDialog } from '@/modules/shifts/components/OpenShiftDialog';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
