@@ -457,15 +457,29 @@ export function DashboardPage() {
       const params = new URLSearchParams();
       if (selectedBranch) params.set('branchId', selectedBranch);
       
-      const res = await fetch(`/api/dashboard/stats?${params.toString()}`);
-      if (!res.ok) throw new Error('Failed to fetch dashboard data');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const res = await fetch(`/api/dashboard/stats?${params.toString()}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
       
       const result = await res.json();
       setData(result);
       setError(null);
-    } catch (e) {
-      setError('حدث خطأ في تحميل البيانات');
-      console.error(e);
+    } catch (e: any) {
+      // Don't show error for aborted requests
+      if (e.name === 'AbortError') {
+        console.log('Request aborted due to timeout');
+      } else {
+        setError('حدث خطأ في تحميل البيانات');
+        console.error('Dashboard fetch error:', e);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
