@@ -1,24 +1,15 @@
 // ============================================
-// POS Module - نقطة البيع
+// POS Module Index - التصدير الرئيسي
 // ============================================
 
-// Types
-export * from './types/pos.types';
+// Components
+export * from './components';
 
 // Hooks
-export { useCart } from './hooks/useCart';
-export { usePayment } from './hooks/usePayment';
-export { useProducts } from './hooks/useProducts';
+export * from './hooks';
 
-// Components
-export { POSPage } from './components/POSPage';
-export { ProductGrid } from './components/ProductGrid';
-export { Cart } from './components/Cart';
-export { PaymentDialog } from './components/PaymentDialog';
-export { InvoicePreview } from './components/InvoicePreview';
+// Types
+export * from './types';
 
-// Store
-export { cartSlice } from './store/cartSlice';
-
-// API
-export { posApi } from './api/posApi';
+// Constants
+export * from './constants/defaults';

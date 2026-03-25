@@ -29,7 +29,8 @@ function PageSkeleton() {
 
 // Lazy loaded pages - تحميل عند الطلب
 const DashboardPage = lazy(() => import('@/components/dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
-const POSPage = lazy(() => import('@/components/pos/POSPage').then(m => ({ default: m.POSPage })));
+// POS Module - استخدام الوحدة الجديدة
+const POSPage = lazy(() => import('@/modules/pos/components/POSPage').then(m => ({ default: m.POSPage })));
 const ProductsPage = lazy(() => import('@/components/products/ProductsPage').then(m => ({ default: m.ProductsPage })));
 const CategoriesPage = lazy(() => import('@/components/products/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
 const BrandsPage = lazy(() => import('@/components/products/BrandsPage').then(m => ({ default: m.BrandsPage })));
