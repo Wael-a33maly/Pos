@@ -345,8 +345,9 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={dailyChartData}>
+                {dailyChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={dailyChartData}>
                     <defs>
                       <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
@@ -389,7 +390,10 @@ export function DashboardPage() {
                       fill="url(#colorProfit)" 
                     />
                   </AreaChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">لا توجد بيانات</div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -419,8 +423,9 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={hourlyChartData}>
+                {hourlyChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={hourlyChartData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="hourLabel" className="text-xs" />
                     <YAxis className="text-xs" />
@@ -440,7 +445,10 @@ export function DashboardPage() {
                       maxBarSize={40}
                     />
                   </BarChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">لا توجد بيانات</div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -465,8 +473,9 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
+                {paymentChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
                     <Pie
                       data={paymentChartData}
                       cx="50%"
@@ -493,7 +502,10 @@ export function DashboardPage() {
                       }}
                     />
                   </PieChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">لا توجد بيانات</div>
+                )}
               </div>
               <Separator className="my-4" />
               <div className="space-y-2">
@@ -596,8 +608,9 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[180px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.branchPerformance} layout="vertical">
+                {data.branchPerformance && data.branchPerformance.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.branchPerformance} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis type="number" className="text-xs" />
                     <YAxis dataKey="name" type="category" width={70} className="text-xs" />
@@ -617,7 +630,10 @@ export function DashboardPage() {
                       maxBarSize={30}
                     />
                   </BarChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">لا توجد بيانات</div>
+                )}
               </div>
               <Separator className="my-4" />
               <ScrollArea className="h-[130px]">

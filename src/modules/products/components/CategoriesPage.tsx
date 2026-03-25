@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import {
-  Plus, Search, Edit, Trash2, MoreHorizontal, Folder, FolderOpen, ChevronRight, Palette
+  Plus, Search, Edit, Trash2, MoreHorizontal, Folder, FolderOpen, ChevronLeft, ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
@@ -19,8 +19,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { Category } from '@/types';
 
 // Mock data
@@ -110,69 +108,26 @@ export function CategoriesPage() {
     setShowAddDialog(true);
   };
 
-  const renderCategoryRow = (category: Category, depth = 0) => {
-    const children = getChildCategories(category.id);
-    const hasChildren = children.length > 0;
-    const isExpanded = expandedCategories.includes(category.id);
-
-    return (
-      <Collapsible key={category.id} open={isExpanded} onOpenChange={() => toggleExpanded(category.id)}>
-        <TableRow className={depth > 0 ? 'bg-muted/30' : ''}>
-          <TableCell>
-            <div className="flex items-center gap-2" style={{ paddingRight: depth * 24 }}>
-              {hasChildren ? (
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <ChevronRight className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                  </Button>
-                </CollapsibleTrigger>
-              ) : (
-                <span className="w-6" />
-              )}
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }} />
-              {hasChildren ? (
-                <FolderOpen className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <Folder className="h-4 w-4 text-muted-foreground" />
-              )}
-              <span className="font-medium">{category.name}</span>
-            </div>
-          </TableCell>
-          <TableCell>{children.length > 0 ? `${children.length} فئة فرعية` : '-'}</TableCell>
-          <TableCell>
-            <Badge variant={category.isActive ? 'default' : 'secondary'}>
-              {category.isActive ? 'نشط' : 'غير نشط'}
-            </Badge>
-          </TableCell>
-          <TableCell>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => openEditDialog(category)}>
-                  <Edit className="ml-2 h-4 w-4" /> تعديل
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setSelectedCategory(category); setFormData(prev => ({ ...prev, parentId: category.id })); setShowAddDialog(true); }}>
-                  <Plus className="ml-2 h-4 w-4" /> إضافة فرعي
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive" onClick={() => { setSelectedCategory(category); setShowDeleteDialog(true); }}>
-                  <Trash2 className="ml-2 h-4 w-4" /> حذف
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TableCell>
-        </TableRow>
-        {hasChildren && (
-          <CollapsibleContent>
-            {children.map(child => renderCategoryRow(child, depth + 1))}
-          </CollapsibleContent>
-        )}
-      </Collapsible>
-    );
+  // Flatten categories for rendering (instead of using Collapsible inside table)
+  const flattenCategories = (cats: Category[], depth = 0): Array<Category & { depth: number; hasChildren: boolean; isExpanded: boolean }> => {
+    const result: Array<Category & { depth: number; hasChildren: boolean; isExpanded: boolean }> = [];
+    
+    cats.forEach(cat => {
+      const children = getChildCategories(cat.id);
+      const hasChildren = children.length > 0;
+      const isExpanded = expandedCategories.includes(cat.id);
+      
+      result.push({ ...cat, depth, hasChildren, isExpanded });
+      
+      if (hasChildren && isExpanded) {
+        result.push(...flattenCategories(children, depth + 1));
+      }
+    });
+    
+    return result;
   };
+
+  const flattenedCategories = flattenCategories(filteredCategories);
 
   return (
     <div className="p-6 space-y-6">
@@ -204,7 +159,86 @@ export function CategoriesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredCategories.map(cat => renderCategoryRow(cat))}
+            {flattenedCategories.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                  لا توجد فئات
+                </TableCell>
+              </TableRow>
+            ) : (
+              flattenedCategories.map(cat => (
+                <TableRow 
+                  key={cat.id} 
+                  className={cat.depth > 0 ? 'bg-muted/30' : ''}
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-2" style={{ paddingRight: cat.depth * 24 }}>
+                      {cat.hasChildren ? (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6"
+                          onClick={() => toggleExpanded(cat.id)}
+                        >
+                          {cat.isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronLeft className="h-4 w-4" />
+                          )}
+                        </Button>
+                      ) : (
+                        <span className="w-6" />
+                      )}
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                      {cat.hasChildren ? (
+                        <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Folder className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="font-medium">{cat.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {cat.hasChildren ? `${getChildCategories(cat.id).length} فئة فرعية` : '-'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={cat.isActive ? 'default' : 'secondary'}>
+                      {cat.isActive ? 'نشط' : 'غير نشط'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEditDialog(cat)}>
+                          <Edit className="ml-2 h-4 w-4" /> تعديل
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { 
+                          setSelectedCategory(cat); 
+                          setFormData(prev => ({ ...prev, parentId: cat.id })); 
+                          setShowAddDialog(true); 
+                        }}>
+                          <Plus className="ml-2 h-4 w-4" /> إضافة فرعي
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-destructive" 
+                          onClick={() => { 
+                            setSelectedCategory(cat); 
+                            setShowDeleteDialog(true); 
+                          }}
+                        >
+                          <Trash2 className="ml-2 h-4 w-4" /> حذف
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </Card>
@@ -222,7 +256,7 @@ export function CategoriesPage() {
             <div>
               <Label>الفئة الأم</Label>
               <select 
-                className="w-full border rounded-md p-2"
+                className="w-full border rounded-md p-2 bg-background"
                 value={formData.parentId}
                 onChange={(e) => setFormData(prev => ({ ...prev, parentId: e.target.value }))}
               >
