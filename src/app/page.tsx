@@ -55,6 +55,8 @@ const SuppliersPage = lazy(() => import('@/modules/suppliers/components/Supplier
 const ExpensesPage = lazy(() => import('@/modules/expenses/components/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 // Accounts Module
 const AccountsPage = lazy(() => import('@/modules/accounts/components/AccountsPage').then(m => ({ default: m.AccountsPage })));
+// Roles Module
+const RolesPage = lazy(() => import('@/modules/roles/components/RolesPage').then(m => ({ default: m.RolesPage })));
 
 function ProfilePage() {
   const { user } = useAppStore();
@@ -75,7 +77,7 @@ function ProfilePage() {
 }
 
 const PAGE_COMPONENTS: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
-  'users': UsersPage, 'roles': UsersPage,
+  'users': UsersPage, 'roles': RolesPage,
   'shifts': ShiftManagementPage, 'shift-close': ShiftManagementPage, 'shift-closures': ShiftManagementPage, 'audit-logs': AuditLogsPage,
   'products': ProductsPage, 'categories': CategoriesPage, 'brands': BrandsPage,
   'customers': CustomersPage, 'suppliers': SuppliersPage, 'supplier-companies': SuppliersPage,
@@ -83,6 +85,7 @@ const PAGE_COMPONENTS: Record<string, React.LazyExoticComponent<React.ComponentT
   'expenses': ExpensesPage, 'expense-categories': ExpensesPage,
   'accounts': AccountsPage, 'reports': ReportsPage, 'settings': UnifiedSettingsPage,
   'barcode': BarcodePrintPage, 'import': ImportProductsPage,
+  'permissions': RolesPage,
 };
 
 function PageContent() {

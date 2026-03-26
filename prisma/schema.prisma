@@ -32,7 +32,58 @@ model Branch {
   inventory   Inventory[]
 }
 
-// ==================== المستخدمين والأدوار ====================
+// ==================== الأدوار المخصصة ====================
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameAr      String
+  description String?
+  color       String   @default("#3b82f6")
+  isSystem    Boolean  @default(false)  // للأدوار الافتراضية
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)      // أولوية الدور (أعلى = صلاحيات أكثر)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  users       User[]
+  permissions RolePermission[]
+}
+
+// ==================== الصلاحيات المتاحة ====================
+model SystemPermission {
+  id          String   @id @default(cuid())
+  module      String   // dashboard, users, products, invoices, expenses, reports, settings, shifts, customers, suppliers, pos, accounts
+  action      String   // view, create, edit, delete, export, import, approve, manage
+  name        String   // الاسم بالإنجليزية
+  nameAr      String   // الاسم بالعربية
+  description String?
+  group       String   // مجموعة الصلاحية للتنظيم
+  groupAr     String   // اسم المجموعة بالعربية
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+  
+  @@unique([module, action])
+}
+
+// ==================== صلاحيات الدور ====================
+model RolePermission {
+  id             String   @id @default(cuid())
+  roleId         String
+  permissionId   String
+  allowed        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  role           Role              @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission     SystemPermission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  @@unique([roleId, permissionId])
+}
+
+// ==================== المستخدمين ====================
 model User {
   id          String   @id @default(cuid())
   email       String   @unique
@@ -41,39 +92,37 @@ model User {
   nameAr      String?
   phone       String?
   avatar      String?
-  role        UserRole @default(USER)
+  roleId      String?  // الدور المخصص
   branchId    String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
   branch      Branch?  @relation(fields: [branchId], references: [id])
+  role        Role?    @relation(fields: [roleId], references: [id])
   shifts      Shift[]
   invoices    Invoice[]
-  permissions Permission[]
+  userPermissions UserPermission[]
   notifications Notification[]
   auditLogs   AuditLog[]
   closedShifts Shift[] @relation("ShiftCloser")
 }
 
-enum UserRole {
-  SUPER_ADMIN
-  BRANCH_ADMIN
-  USER
-}
-
-model Permission {
-  id          String   @id @default(cuid())
-  userId      String
-  module      String   // dashboard, users, products, invoices, expenses, reports, settings
-  action      String   // view, create, edit, delete
-  allowed     Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// ==================== صلاحيات المستخدم الفردية ====================
+model UserPermission {
+  id             String   @id @default(cuid())
+  userId         String
+  permissionId   String
+  allowed        Boolean  @default(true)
+  grantedBy      String?  // من منح الصلاحية
+  grantedAt      DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission     SystemPermission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   
-  @@unique([userId, module, action])
+  @@unique([userId, permissionId])
 }
 
 // ==================== الإعدادات ====================
@@ -342,6 +391,10 @@ model Shift {
   totalExpenses   Float    @default(0)
   totalPayments   Float    @default(0)
   status          ShiftStatus @default(OPEN)
+  closureType     ShiftClosureType?
+  closureReason   String?
+  forceClosedBy   String?
+  sessionRevoked  Boolean  @default(false)
   notes           String?
   closedBy        String?
   createdAt       DateTime @default(now())
@@ -357,6 +410,14 @@ model Shift {
 enum ShiftStatus {
   OPEN
   CLOSED
+  FORCE_CLOSED
+}
+
+enum ShiftClosureType {
+  NORMAL
+  FORCED
+  AUTO
+  BRANCH_ALL
 }
 
 // ==================== المصروفات ====================
