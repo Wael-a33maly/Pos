@@ -3,18 +3,13 @@
 // ============================================
 
 import { useState, useEffect, useCallback } from 'react';
+import { useAppStore } from '@/store';
 import type { 
   DashboardData, 
   CurrencySettings, 
   UseDashboardOptions, 
   UseDashboardReturn 
 } from '../types';
-
-const DEFAULT_CURRENCY: CurrencySettings = {
-  code: 'SAR',
-  symbol: 'ر.س',
-  decimalPlaces: 2,
-};
 
 export function useDashboard(options: UseDashboardOptions = {}): UseDashboardReturn {
   const { 
@@ -28,42 +23,15 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRet
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
-  const [currency, setCurrency] = useState<CurrencySettings>(DEFAULT_CURRENCY);
   const [selectedBranch, setSelectedBranch] = useState(initialBranch);
-
-  // Fetch settings for currency
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const res = await fetch('/api/settings');
-        if (res.ok) {
-          const result = await res.json();
-          const settings = result.settings || {};
-          if (settings.defaultCurrency) {
-            try {
-              const currencies = settings.currencies ? JSON.parse(settings.currencies) : [];
-              const defaultCurrency = currencies.find((c: any) => c.code === settings.defaultCurrency || c.isDefault);
-              if (defaultCurrency) {
-                setCurrency({
-                  code: defaultCurrency.code,
-                  symbol: defaultCurrency.symbol,
-                  decimalPlaces: defaultCurrency.decimalPlaces || 2,
-                });
-              }
-            } catch {
-              setCurrency(prev => ({ ...prev, code: settings.defaultCurrency }));
-            }
-          }
-          if (settings.decimalPlaces) {
-            setCurrency(prev => ({ ...prev, decimalPlaces: parseInt(settings.decimalPlaces) }));
-          }
-        }
-      } catch (e) {
-        console.error('Failed to fetch settings:', e);
-      }
-    };
-    fetchSettings();
-  }, []);
+  
+  // Get currency from store
+  const storeCurrency = useAppStore((state) => state.currency);
+  const currency: CurrencySettings = storeCurrency ? {
+    code: storeCurrency.code,
+    symbol: storeCurrency.symbol,
+    decimalPlaces: storeCurrency.decimalPlaces,
+  } : { code: 'EGP', symbol: 'ج.م', decimalPlaces: 2 };
 
   // Fetch branches for filter
   useEffect(() => {

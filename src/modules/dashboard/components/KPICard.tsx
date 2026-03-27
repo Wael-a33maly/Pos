@@ -6,20 +6,16 @@ import { motion } from 'framer-motion';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { formatCurrencyWithSettings } from '@/lib/currency';
 import type { KPICardProps, CurrencySettings } from '../types';
 
+// Default currency settings (fallback)
+const DEFAULT_CURRENCY: CurrencySettings = { code: 'EGP', symbol: 'ج.م', decimalPlaces: 2 };
+
 // Format currency with dynamic currency
-const formatCurrency = (value: number, currency: CurrencySettings = { code: 'SAR', symbol: 'ر.س', decimalPlaces: 2 }) => {
-  try {
-    return new Intl.NumberFormat('ar-SA', {
-      style: 'currency',
-      currency: currency.code,
-      minimumFractionDigits: currency.decimalPlaces,
-      maximumFractionDigits: currency.decimalPlaces,
-    }).format(value);
-  } catch {
-    return `${value.toFixed(currency.decimalPlaces)} ${currency.symbol}`;
-  }
+const formatValue = (value: number, currency?: CurrencySettings) => {
+  const curr = currency || DEFAULT_CURRENCY;
+  return formatCurrencyWithSettings(value, curr);
 };
 
 // Format number
@@ -50,7 +46,7 @@ export function KPICard({
   currency,
 }: KPICardProps) {
   const formattedValue = formatType === 'currency' 
-    ? formatCurrency(value, currency)
+    ? formatValue(value, currency)
     : formatType === 'percent'
     ? `${value.toFixed(1)}%`
     : formatNumber(value);

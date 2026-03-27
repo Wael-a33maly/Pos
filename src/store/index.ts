@@ -11,6 +11,7 @@ import type {
   Product,
   ProductVariant
 } from '@/types';
+import { DEFAULT_CURRENCY } from '@/lib/currency';
 
 interface AppState {
   // Auth
@@ -118,16 +119,7 @@ export const useAppStore = create<AppState>()(
         notes: undefined,
       },
       
-      currency: {
-        id: 'default',
-        name: 'Saudi Riyal',
-        nameAr: 'ريال سعودي',
-        code: 'SAR',
-        symbol: 'ر.س',
-        decimalPlaces: 2,
-        isDefault: true,
-        isActive: true,
-      },
+      currency: DEFAULT_CURRENCY,
       decimalPlaces: 2,
       
       pendingInvoices: [],
@@ -314,14 +306,20 @@ export const addProductToCart = (
 
 // Format currency
 export const formatCurrency = (amount: number, currency?: Currency | null, decimalPlaces?: number) => {
-  const curr = currency || useAppStore.getState().currency;
-  const decimals = decimalPlaces ?? useAppStore.getState().decimalPlaces ?? 2;
+  const curr = currency || useAppStore.getState().currency || DEFAULT_CURRENCY;
+  const decimals = decimalPlaces ?? curr.decimalPlaces ?? 2;
   
-  const formatted = amount.toFixed(decimals);
-  
-  if (curr) {
+  try {
+    // Use Intl.NumberFormat for proper currency formatting
+    return new Intl.NumberFormat('ar-SA', {
+      style: 'currency',
+      currency: curr.code,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(amount);
+  } catch {
+    // Fallback to simple format if currency code is not supported
+    const formatted = amount.toFixed(decimals);
     return `${formatted} ${curr.symbol}`;
   }
-  
-  return formatted;
 };

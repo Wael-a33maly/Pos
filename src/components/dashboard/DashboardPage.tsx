@@ -1,13 +1,11 @@
-// ============================================
-// Dashboard Page - صفحة لوحة التحكم
-// ============================================
-
 'use client';
 
-import { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp,
+  TrendingDown,
   DollarSign,
   ShoppingCart,
   Users,
@@ -15,17 +13,24 @@ import {
   Store,
   Clock,
   AlertTriangle,
+  ArrowUpRight,
+  ArrowDownRight,
   RefreshCw,
   Calendar,
+  Filter,
   Sparkles,
   Rocket,
   Target,
   Zap,
   ChevronLeft,
+  ChevronRight,
+  Eye,
   MoreHorizontal,
   FileText,
 } from 'lucide-react';
 import {
+  LineChart,
+  Line,
   AreaChart,
   Area,
   BarChart,
@@ -45,6 +50,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -61,26 +67,101 @@ import {
 import { format, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { formatCurrencyWithSettings, formatNumber as formatNumberUtil } from '@/lib/currency';
 
-import { useDashboard } from '../hooks';
-import { KPICard } from './KPICard';
-import { MiniKPICard } from './MiniKPICard';
-import { QuickActionButton } from './QuickActionButton';
-import { DashboardSkeleton } from './DashboardSkeleton';
-import type { CurrencySettings } from '../types';
+// Types
+interface KPIStats {
+  todaySales: number;
+  yesterdaySales: number;
+  salesChange: number;
+  todayInvoices: number;
+  averageOrderValue: number;
+  totalProfit: number;
+  profitMargin: number;
+  topBranch: { id: string; name: string; sales: number } | null;
+  topProduct: { id: string; name: string; quantity: number } | null;
+  topCashier: { id: string; name: string; sales: number } | null;
+  activeShifts: number;
+  lowStockProducts: number;
+}
+
+interface HourlySales {
+  hour: number;
+  sales: number;
+  invoices: number;
+}
+
+interface PaymentDistribution {
+  method: string;
+  methodAr: string;
+  amount: number;
+  count: number;
+  percentage: number;
+}
+
+interface DailySales {
+  date: string;
+  sales: number;
+  profit: number;
+  invoices: number;
+}
+
+interface TopProduct {
+  id: string;
+  name: string;
+  nameAr: string | null;
+  quantity: number;
+  revenue: number;
+  profit: number;
+}
+
+interface BranchPerformance {
+  id: string;
+  name: string;
+  sales: number;
+  profit: number;
+  invoices: number;
+  growth: number;
+}
+
+interface DashboardData {
+  kpis: KPIStats;
+  hourlySales: HourlySales[];
+  paymentDistribution: PaymentDistribution[];
+  dailySales: DailySales[];
+  topProducts: TopProduct[];
+  branchPerformance: BranchPerformance[];
+  recentInvoices: any[];
+  lowStockAlert: any[];
+}
 
 // Colors for charts
 const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+// Currency settings interface
+interface CurrencySettings {
+  code: string;
+  symbol: string;
+  decimalPlaces: number;
+}
+
 // Format currency with dynamic currency
-const formatCurrency = (value: number, currency: CurrencySettings = { code: 'EGP', symbol: 'ج.م', decimalPlaces: 2 }) => {
-  return formatCurrencyWithSettings(value, currency);
+const formatCurrency = (value: number, currency: CurrencySettings = { code: 'SAR', symbol: 'ر.س', decimalPlaces: 2 }) => {
+  try {
+    return new Intl.NumberFormat('ar-SA', {
+      style: 'currency',
+      currency: currency.code,
+      minimumFractionDigits: currency.decimalPlaces,
+      maximumFractionDigits: currency.decimalPlaces,
+    }).format(value);
+  } catch {
+    // Fallback if currency code is not valid
+    return `${value.toFixed(currency.decimalPlaces)} ${currency.symbol}`;
+  }
 };
 
 // Format number
 const formatNumber = (value: number) => {
-  return formatNumberUtil(value);
+  return new Intl.NumberFormat('ar-SA').format(value);
 };
 
 // Animation variants
@@ -94,47 +175,382 @@ const containerVariants = {
   },
 };
 
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 },
+};
+
+const cardHoverVariants = {
+  rest: { scale: 1 },
+  hover: { scale: 1.02, transition: { duration: 0.2 } },
+};
+
+// KPI Card Component with animations
+function KPICard({
+  title,
+  value,
+  change,
+  changeLabel,
+  icon: Icon,
+  format: formatType = 'currency',
+  index = 0,
+  gradient,
+  currency,
+}: {
+  title: string;
+  value: number;
+  change?: number;
+  changeLabel?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  format?: 'currency' | 'number' | 'percent';
+  index?: number;
+  gradient?: string;
+  currency?: CurrencySettings;
+}) {
+  const formattedValue = formatType === 'currency' 
+    ? formatCurrency(value, currency)
+    : formatType === 'percent'
+    ? `${value.toFixed(1)}%`
+    : formatNumber(value);
+
+  const isPositive = change !== undefined && change >= 0;
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      initial="hidden"
+      animate="show"
+      transition={{ delay: index * 0.1 }}
+    >
+      <motion.div
+        variants={cardHoverVariants}
+        initial="rest"
+        whileHover="hover"
+        className="h-full"
+      >
+        <Card className={cn(
+          "relative overflow-hidden h-full transition-all duration-300",
+          "hover:shadow-lg hover:shadow-primary/5",
+          "border-transparent hover:border-primary/20"
+        )}>
+          {/* Background gradient */}
+          <div className={cn(
+            "absolute inset-0 opacity-5",
+            gradient || "bg-gradient-to-br from-primary to-transparent"
+          )} />
+          
+          <CardContent className="p-6 relative">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground font-medium">{title}</p>
+                <motion.p 
+                  className="text-3xl font-bold mt-2 bg-gradient-to-l bg-clip-text"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 + index * 0.1 }}
+                >
+                  {formattedValue}
+                </motion.p>
+                {change !== undefined && (
+                  <motion.div 
+                    className={cn(
+                      "flex items-center gap-1.5 mt-3 text-sm",
+                      isPositive ? "text-emerald-600" : "text-rose-600"
+                    )}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 + index * 0.1 }}
+                  >
+                    <span className={cn(
+                      "p-1 rounded-full",
+                      isPositive ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-rose-100 dark:bg-rose-900/30"
+                    )}>
+                      {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                    </span>
+                    <span className="font-semibold">{Math.abs(change).toFixed(1)}%</span>
+                    {changeLabel && <span className="text-muted-foreground text-xs">{changeLabel}</span>}
+                  </motion.div>
+                )}
+              </div>
+              
+              <motion.div 
+                className={cn(
+                  "p-4 rounded-2xl shadow-inner",
+                  "bg-gradient-to-br from-primary/20 to-primary/5",
+                  "dark:from-primary/30 dark:to-primary/10"
+                )}
+                whileHover={{ rotate: 5, scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <Icon className="h-7 w-7 text-primary" />
+              </motion.div>
+            </div>
+            
+            {/* Decorative elements */}
+            <div className="absolute -bottom-2 -right-2 w-20 h-20 rounded-full bg-primary/5 blur-xl" />
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// Quick Action Button
+function QuickActionButton({
+  icon: Icon,
+  label,
+  onClick,
+  color,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick?: () => void;
+  color: string;
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center gap-2 p-4 rounded-2xl",
+        "bg-gradient-to-br from-muted/50 to-muted/30",
+        "hover:from-muted hover:to-muted/50",
+        "transition-all duration-300 group"
+      )}
+    >
+      <div className={cn(
+        "p-3 rounded-xl transition-all duration-300",
+        "group-hover:scale-110",
+        color
+      )}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+        {label}
+      </span>
+    </motion.button>
+  );
+}
+
+// Mini KPI Card with animation
+function MiniKPICard({
+  title,
+  value,
+  icon: Icon,
+  color = 'text-primary',
+  index = 0,
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ComponentType<{ className?: string }>;
+  color?: string;
+  index?: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.4 + index * 0.05 }}
+      whileHover={{ scale: 1.02 }}
+      className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 hover:from-muted/70 hover:to-muted/40 transition-all duration-300"
+    >
+      <div className={cn("p-2.5 rounded-xl bg-background/50", color)}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground">{title}</p>
+        <p className="font-bold text-lg">{value}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+// Skeleton loader
+function SkeletonCard() {
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="flex justify-between items-start">
+            <div className="space-y-2 flex-1">
+              <div className="h-4 bg-muted rounded w-1/2" />
+              <div className="h-8 bg-muted rounded w-3/4" />
+              <div className="h-3 bg-muted rounded w-1/3" />
+            </div>
+            <div className="h-14 w-14 bg-muted rounded-2xl" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function DashboardPage() {
-  const {
-    data,
-    loading,
-    error,
-    refreshing,
-    branches,
-    currency,
-    selectedBranch,
-    setSelectedBranch,
-    refresh,
-  } = useDashboard();
+  const searchParams = useSearchParams();
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<string>('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+  const [currency, setCurrency] = useState<CurrencySettings>({ code: 'SAR', symbol: 'ر.س', decimalPlaces: 2 });
+
+  // Fetch settings for currency
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/settings');
+        if (res.ok) {
+          const result = await res.json();
+          const settings = result.settings || {};
+          if (settings.defaultCurrency) {
+            // Find currency from currencies list
+            try {
+              const currencies = settings.currencies ? JSON.parse(settings.currencies) : [];
+              const defaultCurrency = currencies.find((c: any) => c.code === settings.defaultCurrency || c.isDefault);
+              if (defaultCurrency) {
+                setCurrency({
+                  code: defaultCurrency.code,
+                  symbol: defaultCurrency.symbol,
+                  decimalPlaces: defaultCurrency.decimalPlaces || 2,
+                });
+              }
+            } catch {
+              // Use default currency code if currencies list is not available
+              setCurrency(prev => ({ ...prev, code: settings.defaultCurrency }));
+            }
+          }
+          if (settings.decimalPlaces) {
+            setCurrency(prev => ({ ...prev, decimalPlaces: parseInt(settings.decimalPlaces) }));
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch settings:', e);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // Fetch branches for filter
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const res = await fetch('/api/branches');
+        if (res.ok) {
+          const data = await res.json();
+          setBranches(data.branches || data || []);
+        }
+      } catch (e) {
+        console.error('Failed to fetch branches:', e);
+      }
+    };
+    fetchBranches();
+  }, []);
+
+  // Fetch dashboard data
+  const fetchData = async (showRefreshing = false) => {
+    if (showRefreshing) setRefreshing(true);
+    else setLoading(true);
+    
+    try {
+      const params = new URLSearchParams();
+      if (selectedBranch) params.set('branchId', selectedBranch);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const res = await fetch(`/api/dashboard/stats?${params.toString()}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
+      const result = await res.json();
+      setData(result);
+      setError(null);
+    } catch (e: any) {
+      // Don't show error for aborted requests
+      if (e.name === 'AbortError') {
+        console.log('Request aborted due to timeout');
+      } else {
+        setError('حدث خطأ في تحميل البيانات');
+        console.error('Dashboard fetch error:', e);
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [selectedBranch]);
+
+  // Auto refresh every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData(true);
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [selectedBranch]);
 
   // Prepare chart data
   const hourlyChartData = useMemo(() => {
-    if (!data) return [];
+    if (!data?.hourlySales) return [];
     return data.hourlySales.map(item => ({
       ...item,
       hourLabel: `${item.hour}:00`,
     }));
-  }, [data]);
+  }, [data?.hourlySales]);
 
   const paymentChartData = useMemo(() => {
-    if (!data) return [];
+    if (!data?.paymentDistribution) return [];
     return data.paymentDistribution.map(item => ({
       name: item.methodAr,
       value: item.amount,
       percentage: item.percentage,
     }));
-  }, [data]);
+  }, [data?.paymentDistribution]);
 
   const dailyChartData = useMemo(() => {
-    if (!data) return [];
+    if (!data?.dailySales) return [];
     return data.dailySales.map(item => ({
       ...item,
       dateLabel: format(parseISO(item.date), 'EEE', { locale: ar }),
     }));
-  }, [data]);
+  }, [data?.dailySales]);
 
   if (loading) {
-    return <DashboardSkeleton />;
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div className="animate-pulse space-y-2">
+            <div className="h-8 bg-muted rounded w-48" />
+            <div className="h-4 bg-muted rounded w-32" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-10 w-40 bg-muted rounded animate-pulse" />
+            <div className="h-10 w-10 bg-muted rounded animate-pulse" />
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-20 bg-muted/50 rounded-xl animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (error || !data) {
@@ -153,7 +569,7 @@ export function DashboardPage() {
           </motion.div>
           <p className="text-lg font-medium mb-2">{error || 'لا توجد بيانات'}</p>
           <p className="text-muted-foreground mb-4">حدث خطأ أثناء تحميل البيانات</p>
-          <Button onClick={refresh} className="gap-2">
+          <Button onClick={() => fetchData()} className="gap-2">
             <RefreshCw className="h-4 w-4" />
             إعادة المحاولة
           </Button>
@@ -205,11 +621,19 @@ export function DashboardPage() {
             <Button 
               variant="outline" 
               size="icon" 
-              onClick={refresh}
+              onClick={() => fetchData(true)}
               disabled={refreshing}
               className="relative overflow-hidden"
             >
               <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              {!refreshing && (
+                <motion.div
+                  className="absolute inset-0 bg-primary/20"
+                  initial={{ scale: 0, opacity: 0 }}
+                  whileHover={{ scale: 2, opacity: 0 }}
+                  transition={{ duration: 0.5 }}
+                />
+              )}
             </Button>
           </motion.div>
         </div>
@@ -337,9 +761,8 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                {dailyChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={dailyChartData}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={dailyChartData}>
                     <defs>
                       <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
@@ -382,10 +805,7 @@ export function DashboardPage() {
                       fill="url(#colorProfit)" 
                     />
                   </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">لا توجد بيانات</div>
-                )}
+                </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
@@ -415,9 +835,8 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                {hourlyChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={hourlyChartData}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={hourlyChartData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="hourLabel" className="text-xs" />
                     <YAxis className="text-xs" />
@@ -437,10 +856,7 @@ export function DashboardPage() {
                       maxBarSize={40}
                     />
                   </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">لا توجد بيانات</div>
-                )}
+                </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
@@ -465,9 +881,8 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[200px]">
-                {paymentChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
                     <Pie
                       data={paymentChartData}
                       cx="50%"
@@ -494,10 +909,7 @@ export function DashboardPage() {
                       }}
                     />
                   </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">لا توجد بيانات</div>
-                )}
+                </ResponsiveContainer>
               </div>
               <Separator className="my-4" />
               <div className="space-y-2">
@@ -600,9 +1012,8 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="h-[180px]">
-                {data.branchPerformance && data.branchPerformance.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.branchPerformance} layout="vertical">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.branchPerformance} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis type="number" className="text-xs" />
                     <YAxis dataKey="name" type="category" width={70} className="text-xs" />
@@ -622,10 +1033,7 @@ export function DashboardPage() {
                       maxBarSize={30}
                     />
                   </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">لا توجد بيانات</div>
-                )}
+                </ResponsiveContainer>
               </div>
               <Separator className="my-4" />
               <ScrollArea className="h-[130px]">
@@ -655,64 +1063,146 @@ export function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Bottom Section - Recent Invoices */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-      >
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5 text-primary" />
-                  آخر الفواتير
-                </CardTitle>
-                <CardDescription>أحدث العمليات</CardDescription>
+      {/* Bottom Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Invoices */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5 text-primary" />
+                    آخر الفواتير
+                  </CardTitle>
+                  <CardDescription>أحدث العمليات</CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                  عرض الكل
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
               </div>
-              <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                عرض الكل
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px]">
-              <div className="space-y-3">
-                {data.recentInvoices.map((invoice, index) => (
-                  <motion.div 
-                    key={invoice.id} 
-                    className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-l from-muted/30 to-transparent hover:from-muted/50 transition-all duration-300 cursor-pointer group"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.8 + index * 0.05 }}
-                    whileHover={{ x: -5 }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                        <ShoppingCart className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-3">
+                  {data.recentInvoices.map((invoice, index) => (
+                    <motion.div 
+                      key={invoice.id} 
+                      className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-l from-muted/30 to-transparent hover:from-muted/50 transition-all duration-300 cursor-pointer group"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.8 + index * 0.05 }}
+                      whileHover={{ x: -5 }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                          <ShoppingCart className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{invoice.invoiceNumber}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {invoice.branch?.name} • {invoice.user?.name}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{invoice.invoiceNumber}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {invoice.branch?.name} • {invoice.user?.name}
+                      <div className="text-left">
+                        <p className="font-bold text-lg">{formatCurrency(invoice.totalAmount, currency)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(invoice.createdAt), 'HH:mm')}
                         </p>
                       </div>
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold text-lg">{formatCurrency(invoice.totalAmount, currency)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(invoice.createdAt), 'HH:mm')}
-                      </p>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Low Stock Alert */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-500" />
+                  تنبيه المخزون
+                </CardTitle>
+                {data.lowStockAlert.length > 0 && (
+                  <Badge variant="destructive" className="gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {data.lowStockAlert.length} منتج
+                  </Badge>
+                )}
               </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </motion.div>
+              <CardDescription>منتجات تحتاج إعادة طلب</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[300px]">
+                <AnimatePresence mode="popLayout">
+                  {data.lowStockAlert.length > 0 ? (
+                    <div className="space-y-3">
+                      {data.lowStockAlert.map((item: any, index: number) => (
+                        <motion.div 
+                          key={item.id} 
+                          className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-l from-amber-50 to-transparent dark:from-amber-950/30 border border-amber-200 dark:border-amber-800/50"
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ delay: index * 0.05 }}
+                          whileHover={{ scale: 1.02 }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/50">
+                              <Package className="h-4 w-4 text-amber-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{item.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {item.category?.name} • الحد الأدنى: {item.minStock || 0}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="destructive" className="gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              {item.quantity || 0} متبقي
+                            </Badge>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <motion.div 
+                      className="text-center py-12"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
+                      <motion.div
+                        animate={{ y: [0, -10, 0] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <Package className="h-16 w-16 mx-auto text-emerald-500 mb-4 opacity-50" />
+                      </motion.div>
+                      <p className="text-muted-foreground font-medium">ممتاز!</p>
+                      <p className="text-sm text-muted-foreground">لا توجد منتجات منخفضة المخزون</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
     </div>
   );
 }
