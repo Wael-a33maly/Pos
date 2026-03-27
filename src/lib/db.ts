@@ -4,6 +4,7 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
+// Force rebuild after Prisma client regeneration - v2
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({

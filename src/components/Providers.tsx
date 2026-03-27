@@ -25,6 +25,8 @@ export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initCurrency = async () => {
       try {
+        // Clear cache first to ensure fresh data
+        clearCurrencyCache();
         const currency = await fetchDefaultCurrency();
         setCurrency(currency);
         setDecimalPlaces(currency.decimalPlaces);

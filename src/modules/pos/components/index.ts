@@ -24,6 +24,7 @@ export { CustomerSearch } from './CustomerSearch';
 // Dialog Components
 export { PaymentDialog } from './PaymentDialog';
 export { POSSettingsDialog } from './POSSettingsDialog';
+export { VariationSelectionDialog } from './VariationSelectionDialog';
 export {
   PendingInvoicesDialog,
   ReturnDialog,

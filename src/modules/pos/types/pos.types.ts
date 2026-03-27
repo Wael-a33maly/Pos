@@ -2,7 +2,17 @@
 // POS Types - أنواع نقطة البيع
 // ============================================
 
-import type { Product, Customer, Category } from '@/types';
+import type { Product as GlobalProduct, Customer, Category, ProductVariation } from '@/types';
+
+// ============================================
+// Product Types - أنواع المنتجات
+// ============================================
+
+export interface Product extends GlobalProduct {
+  variations?: ProductVariation[];
+  inventory?: { quantity: number }[];
+  isStockTracked?: boolean;
+}
 
 // ============================================
 // Cart Types - أنواع سلة المشتريات
@@ -19,6 +29,8 @@ export interface CartItem {
   discountAmount: number;
   totalAmount: number;
   product?: Product;
+  variationId?: string;     // للنظام الجديد
+  variation?: ProductVariation;
 }
 
 export interface CartState {

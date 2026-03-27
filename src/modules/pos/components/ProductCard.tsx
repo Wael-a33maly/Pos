@@ -4,10 +4,12 @@
 
 import { memo } from 'react';
 import { motion } from 'framer-motion';
-import { Package } from 'lucide-react';
+import { Package, Tag } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/store';
+import { cn } from '@/lib/utils';
 import type { Product, POSSettings } from '../types/pos.types';
 
 interface ProductCardProps {
@@ -27,6 +29,14 @@ const ProductCard = memo(function ProductCard({
   currency,
   onAddToCart,
 }: ProductCardProps) {
+  const hasVariations = product.variations && product.variations.length > 0;
+  const variationCount = hasVariations ? product.variations!.length : 0;
+  
+  // حساب المخزون
+  const stock = product.inventory?.reduce((sum, inv) => sum + inv.quantity, 0) || 0;
+  const isLowStock = product.isStockTracked && stock <= (product.minStock || 5);
+  const isOutOfStock = product.isStockTracked && stock === 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -35,14 +45,27 @@ const ProductCard = memo(function ProductCard({
       whileTap={{ scale: 0.98 }}
     >
       <Card
-        className="cursor-pointer transition-all hover:shadow-lg"
+        className={cn(
+          "cursor-pointer transition-all hover:shadow-lg relative",
+          isOutOfStock && "opacity-60"
+        )}
         style={{
           borderWidth: settings.cardBorderWidth,
           borderColor: settings.cardBorderColor,
           borderRadius: settings.cardBorderRadius,
         }}
-        onClick={() => onAddToCart(product)}
+        onClick={() => !isOutOfStock && onAddToCart(product)}
       >
+        {/* شارة المتغيرات */}
+        {hasVariations && (
+          <div className="absolute -top-2 -left-2 z-10">
+            <Badge className="bg-purple-500 hover:bg-purple-600 text-white gap-1">
+              <Tag className="h-3 w-3" />
+              {variationCount} سعر
+            </Badge>
+          </div>
+        )}
+
         <CardContent
           className="flex flex-col h-full"
           style={{ padding: settings.cardPadding }}
@@ -51,10 +74,22 @@ const ProductCard = memo(function ProductCard({
           {settings.showProductImage && (
             <>
               <div
-                className="aspect-square bg-muted rounded-md mb-2 flex items-center justify-center overflow-hidden"
+                className="aspect-square bg-muted rounded-md mb-2 flex items-center justify-center overflow-hidden relative"
                 style={{ borderRadius: settings.cardBorderRadius - 2 }}
               >
                 <Package className="h-8 w-8 text-muted-foreground" />
+                
+                {/* شارة المخزون */}
+                {settings.showProductStock && product.isStockTracked && (
+                  <div className="absolute bottom-1 left-1 right-1">
+                    <Badge 
+                      variant={isLowStock ? "destructive" : "secondary"}
+                      className="w-full justify-center text-xs"
+                    >
+                      {stock} متبقي
+                    </Badge>
+                  </div>
+                )}
               </div>
               <Separator className="mb-2" />
             </>
@@ -91,15 +126,22 @@ const ProductCard = memo(function ProductCard({
 
           {/* السعر */}
           {settings.showProductPrice && (
-            <p
-              className="font-bold mt-auto"
-              style={{
-                fontSize: settings.productPriceFontSize,
-                color: settings.productPriceColor,
-              }}
-            >
-              {formatCurrency(product.sellingPrice, currency)}
-            </p>
+            <div className="mt-auto">
+              <p
+                className="font-bold"
+                style={{
+                  fontSize: settings.productPriceFontSize,
+                  color: settings.productPriceColor,
+                }}
+              >
+                {formatCurrency(product.sellingPrice, currency)}
+              </p>
+              {hasVariations && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  أسعار متعددة متاحة
+                </p>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

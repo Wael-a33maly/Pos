@@ -58,13 +58,15 @@ export interface Product {
   unit: string;
   image?: string;
   hasVariants: boolean;
+  isStockTracked: boolean;  // هل المنتج مخزني
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
   category?: Category;
   brand?: Brand;
   supplier?: Supplier;
-  variants?: ProductVariant[];
+  variants?: ProductVariant[];      // النظام القديم
+  variations?: ProductVariation[];  // النظام الجديد (أسعار متعددة)
   inventory?: Inventory[];
 }
 
@@ -80,6 +82,21 @@ export interface ProductVariant {
   stock: number;
   attributes?: string;
   isActive: boolean;
+}
+
+// النظام الجديد - متغيرات الأسعار
+export interface ProductVariation {
+  id: string;
+  productId: string;
+  price: number;           // سعر المتغير
+  name?: string;           // اسم اختياري للتمييز
+  barcode: string;         // باركود فريد
+  stock: number;           // المخزون
+  isStockTracked: boolean; // هل المتغير مخزني
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Category {
@@ -178,7 +195,8 @@ export interface InvoiceItem {
   id: string;
   invoiceId: string;
   productId?: string;
-  variantId?: string;
+  variantId?: string;     // النظام القديم
+  variationId?: string;   // النظام الجديد
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -189,6 +207,7 @@ export interface InvoiceItem {
   notes?: string;
   product?: Product;
   variant?: ProductVariant;
+  variation?: ProductVariation;
 }
 
 export interface Payment {
@@ -315,7 +334,8 @@ export interface BarcodeSetting {
 export interface CartItem {
   id: string;
   productId?: string;
-  variantId?: string;
+  variantId?: string;      // النظام القديم
+  variationId?: string;    // النظام الجديد
   productName: string;
   barcode?: string;
   quantity: number;
@@ -325,6 +345,7 @@ export interface CartItem {
   totalAmount: number;
   product?: Product;
   variant?: ProductVariant;
+  variation?: ProductVariation;
 }
 
 export interface Cart {

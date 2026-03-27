@@ -16,7 +16,7 @@ import { useAppStore, formatCurrency } from '@/store';
 import { useProducts } from '../hooks/useProducts';
 import { usePayment } from '../hooks/usePayment';
 import { useSettings } from '../hooks/useSettings';
-import type { Product, Customer, ViewMode, CartItem, PendingInvoice } from '../types/pos.types';
+import type { Product, Customer, ViewMode, CartItem, PendingInvoice, ProductVariation } from '../types/pos.types';
 import { mockCustomers } from '../constants/defaults';
 
 // Component imports
@@ -28,6 +28,7 @@ import { CartFooter } from './CartFooter';
 import { CustomerSearch } from './CustomerSearch';
 import { PaymentDialog } from './PaymentDialog';
 import { POSSettingsDialog } from './POSSettingsDialog';
+import { VariationSelectionDialog } from './VariationSelectionDialog';
 import {
   PendingInvoicesDialog,
   ReturnDialog,
@@ -95,6 +96,10 @@ export function POSPage() {
   const [showShiftDialog, setShowShiftDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showAddCustomerDialog, setShowAddCustomerDialog] = useState(false);
+  
+  // State for variation selection
+  const [showVariationDialog, setShowVariationDialog] = useState(false);
+  const [selectedProductForVariation, setSelectedProductForVariation] = useState<Product | null>(null);
 
   // Return/Expense states
   const [returnInvoiceNumber, setReturnInvoiceNumber] = useState('');
@@ -109,6 +114,14 @@ export function POSPage() {
 
   // Handlers
   const handleAddToCart = useCallback((product: Product) => {
+    // التحقق من وجود متغيرات
+    if (product.variations && product.variations.length > 0) {
+      setSelectedProductForVariation(product);
+      setShowVariationDialog(true);
+      return;
+    }
+    
+    // منتج عادي بدون متغيرات
     const item: CartItem = {
       id: Date.now().toString(),
       productId: product.id,
@@ -123,6 +136,28 @@ export function POSPage() {
     };
     addToCart(item);
   }, [addToCart]);
+
+  // Handle variation selection
+  const handleVariationSelect = useCallback((selection: { variation?: ProductVariation; price: number; barcode: string }) => {
+    if (!selectedProductForVariation) return;
+    
+    const item: CartItem = {
+      id: Date.now().toString(),
+      productId: selectedProductForVariation.id,
+      productName: selectedProductForVariation.name,
+      barcode: selection.barcode,
+      quantity: 1,
+      unitPrice: selection.price,
+      costPrice: selectedProductForVariation.costPrice,
+      discountAmount: 0,
+      totalAmount: selection.price,
+      product: selectedProductForVariation,
+      variationId: selection.variation?.id,
+      variation: selection.variation,
+    };
+    addToCart(item);
+    setSelectedProductForVariation(null);
+  }, [selectedProductForVariation, addToCart]);
 
   const handlePayment = useCallback(() => {
     setShowPaymentDialog(false);
@@ -309,6 +344,14 @@ export function POSPage() {
         settings={settings}
         onUpdateSettings={updateSettings}
         onResetSettings={resetSettings}
+      />
+
+      <VariationSelectionDialog
+        open={showVariationDialog}
+        onOpenChange={setShowVariationDialog}
+        product={selectedProductForVariation}
+        currency={currency}
+        onSelect={handleVariationSelect}
       />
 
       <PendingInvoicesDialog

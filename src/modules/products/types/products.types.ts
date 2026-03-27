@@ -2,7 +2,7 @@
 // Products Types - أنواع المنتجات
 // ============================================
 
-import type { Product as GlobalProduct, ProductVariant as GlobalProductVariant, Category, Brand, Supplier } from '@/types';
+import type { Product as GlobalProduct, ProductVariant as GlobalProductVariant, ProductVariation as GlobalProductVariation, Category, Brand, Supplier } from '@/types';
 
 // Re-export global types
 export type { Category, Brand, Supplier };
@@ -10,6 +10,7 @@ export type { Category, Brand, Supplier };
 // Extended Product type for module
 export interface Product extends GlobalProduct {
   variants?: ProductVariant[];
+  variations?: ProductVariation[];
 }
 
 export interface ProductVariant extends GlobalProductVariant {
@@ -23,6 +24,19 @@ export interface ProductVariant extends GlobalProductVariant {
   sellingPrice: number;
   stock: number;
   attributes?: string;
+}
+
+// النظام الجديد - متغيرات الأسعار
+export interface ProductVariation extends GlobalProductVariation {
+  id: string;
+  productId: string;
+  price: number;
+  name?: string;
+  barcode: string;
+  stock: number;
+  isStockTracked: boolean;
+  isActive: boolean;
+  sortOrder: number;
 }
 
 // Form Data Types
@@ -42,9 +56,11 @@ export interface ProductFormData {
   maxStock: number;
   unit: string;
   hasVariants: boolean;
+  isStockTracked: boolean;  // هل المنتج مخزني
   isActive: boolean;
 }
 
+// النظام القديم للمتغيرات
 export interface VariantFormData {
   name: string;
   nameAr: string;
@@ -54,6 +70,16 @@ export interface VariantFormData {
   sellingPrice: number;
   stock: number;
   attributes: string;
+}
+
+// النظام الجديد - نموذج متغير السعر
+export interface VariationFormData {
+  id?: string;
+  price: number;
+  name?: string;
+  barcode: string;
+  stock: number;
+  isStockTracked: boolean;
 }
 
 // API Response Types

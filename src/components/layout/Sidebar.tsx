@@ -37,6 +37,12 @@ import {
   Sparkles,
   Zap,
   TrendingUp,
+  ArrowRightLeft,
+  Gift,
+  Percent,
+  ClipboardList,
+  ShoppingBag,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -127,11 +133,60 @@ const sidebarItems: SidebarItem[] = [
     color: 'text-cyan-500',
   },
   { 
+    title: 'تحويلات المخزون', 
+    href: '/?page=transfers', 
+    icon: ArrowRightLeft, 
+    permission: 'transfers',
+    color: 'text-teal-500',
+  },
+  { 
+    title: 'نظام الولاء', 
+    href: '/?page=loyalty', 
+    icon: Gift, 
+    permission: 'loyalty',
+    color: 'text-pink-500',
+  },
+  { 
+    title: 'العروض والخصومات', 
+    href: '/?page=offers', 
+    icon: Percent, 
+    permission: 'offers',
+    color: 'text-rose-500',
+  },
+  { 
+    title: 'الجرد الدوري', 
+    href: '/?page=inventory', 
+    icon: ClipboardList, 
+    permission: 'inventory',
+    color: 'text-violet-500',
+  },
+  { 
+    title: 'المشتريات', 
+    href: '/?page=purchases', 
+    icon: ShoppingBag, 
+    permission: 'purchases',
+    color: 'text-sky-500',
+  },
+  { 
+    title: 'التقارير المجدولة', 
+    href: '/?page=scheduled-reports', 
+    icon: Clock, 
+    permission: 'reports',
+    color: 'text-slate-500',
+  },
+  { 
     title: 'التقارير والتحليلات', 
     href: '/?page=reports', 
     icon: BarChart3, 
     permission: 'reports',
     color: 'text-indigo-500',
+  },
+  { 
+    title: 'إعدادات الطباعة', 
+    href: '/?page=printing', 
+    icon: Printer, 
+    permission: 'printing',
+    color: 'text-orange-500',
   },
   {
     title: 'الإعدادات',

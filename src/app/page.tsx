@@ -57,6 +57,20 @@ const ExpensesPage = lazy(() => import('@/modules/expenses/components/ExpensesPa
 const AccountsPage = lazy(() => import('@/modules/accounts/components/AccountsPage').then(m => ({ default: m.AccountsPage })));
 // Roles Module
 const RolesPage = lazy(() => import('@/modules/roles/components/RolesPage').then(m => ({ default: m.RolesPage })));
+// Transfers Module
+const TransfersPage = lazy(() => import('@/modules/transfers/components/TransfersPage').then(m => ({ default: m.TransfersPage })));
+// Loyalty Module
+const LoyaltyPage = lazy(() => import('@/modules/loyalty/components/LoyaltyPage').then(m => ({ default: m.LoyaltyPage })));
+// Scheduled Reports Module
+const ScheduledReportsPage = lazy(() => import('@/modules/scheduled-reports/components/ScheduledReportsPage').then(m => ({ default: m.ScheduledReportsPage })));
+// Offers Module
+const OffersPage = lazy(() => import('@/modules/offers/components/OffersPage').then(m => ({ default: m.OffersPage })));
+// Inventory Module
+const InventoryPage = lazy(() => import('@/modules/inventory/components/InventoryPage').then(m => ({ default: m.InventoryPage })));
+// Purchases Module
+const PurchasesPage = lazy(() => import('@/modules/purchases/components/PurchasesPage').then(m => ({ default: m.PurchasesPage })));
+// Printing Module
+const PrintingPage = lazy(() => import('@/modules/printing/components/PrintingPage').then(m => ({ default: m.PrintingPage })));
 
 function ProfilePage() {
   const { user } = useAppStore();
@@ -86,6 +100,13 @@ const PAGE_COMPONENTS: Record<string, React.LazyExoticComponent<React.ComponentT
   'accounts': AccountsPage, 'reports': ReportsPage, 'settings': UnifiedSettingsPage,
   'barcode': BarcodePrintPage, 'import': ImportProductsPage,
   'permissions': RolesPage,
+  'transfers': TransfersPage,
+  'loyalty': LoyaltyPage,
+  'scheduled-reports': ScheduledReportsPage,
+  'offers': OffersPage,
+  'inventory': InventoryPage,
+  'purchases': PurchasesPage,
+  'printing': PrintingPage,
 };
 
 function PageContent() {

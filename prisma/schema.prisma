@@ -45,7 +45,7 @@ model Role {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
-  users       User[]
+  users       User[]   @relation("UserRole")
   permissions RolePermission[]
 }
 
@@ -92,14 +92,15 @@ model User {
   nameAr      String?
   phone       String?
   avatar      String?
-  roleId      String?  // الدور المخصص
+  role        String   @default("USER")  // للتوافق مع الكود القديم: SUPER_ADMIN, BRANCH_ADMIN, USER
+  roleId      String?  // الدور المخصص من نظام الأدوار الجديد
   branchId    String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
   branch      Branch?  @relation(fields: [branchId], references: [id])
-  role        Role?    @relation(fields: [roleId], references: [id])
+  roleRef     Role?    @relation("UserRole", fields: [roleId], references: [id])
   shifts      Shift[]
   invoices    Invoice[]
   userPermissions UserPermission[]
@@ -230,6 +231,7 @@ model Customer {
   
   branch      Branch?  @relation(fields: [branchId], references: [id])
   invoices    Invoice[]
+  loyalty     CustomerLoyalty?
 }
 
 // ==================== المنتجات ====================
@@ -252,6 +254,7 @@ model Product {
   unit          String   @default("piece")
   image         String?
   hasVariants   Boolean  @default(false)
+  isStockTracked Boolean @default(true)  // هل المنتج مخزني (يتقيد بالمخزون)
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -260,9 +263,43 @@ model Product {
   brand         Brand?     @relation(fields: [brandId], references: [id])
   supplier      Supplier?  @relation(fields: [supplierId], references: [id])
   branch        Branch?    @relation(fields: [branchId], references: [id])
-  variants      ProductVariant[]
+  variations    ProductVariation[]  // المتغيرات الجديدة (أسعار متعددة)
+  variants      ProductVariant[]    // القديم للتوافق
   inventory     Inventory[]
   invoiceItems  InvoiceItem[]
+  transferItems StockTransferItem[] // تحويلات المخزون
+}
+
+// ==================== متغيرات المنتج (النظام الجديد - أسعار متعددة) ====================
+model ProductVariation {
+  id            String   @id @default(cuid())
+  productId     String
+  
+  // سعر هذا المتغير
+  price         Float    @default(0)
+  
+  // اسم اختياري للتمييز (مثل "سعر الجملة" أو "عرض خاص")
+  name          String?
+  
+  // باركود فريد يتبع المنتج الأصلي
+  barcode       String   @unique
+  
+  // التحكم في المخزون
+  stock         Int      @default(0)
+  isStockTracked Boolean @default(true)  // هل هذا المتغير مخزني
+  
+  // الحالة
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  invoiceItems  InvoiceItem[]
+  
+  @@index([productId])
+  @@index([barcode])
 }
 
 model ProductVariant {
@@ -347,7 +384,8 @@ model InvoiceItem {
   id            String   @id @default(cuid())
   invoiceId     String
   productId     String?
-  variantId     String?
+  variantId     String?   // للنظام القديم
+  variationId   String?   // للنظام الجديد (متغيرات الأسعار)
   productName   String
   quantity      Float    @default(1)
   unitPrice     Float    @default(0)
@@ -358,9 +396,10 @@ model InvoiceItem {
   notes         String?
   createdAt     DateTime @default(now())
   
-  invoice       Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  product       Product?       @relation(fields: [productId], references: [id])
+  invoice       Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product       Product?        @relation(fields: [productId], references: [id])
   variant       ProductVariant? @relation(fields: [variantId], references: [id])
+  variation     ProductVariation? @relation(fields: [variationId], references: [id])
 }
 
 model Payment {
@@ -898,4 +937,812 @@ model ShiftPaymentSummary {
   createdAt       DateTime @default(now())
   
   @@unique([shiftId, paymentMethodId])
+}
+
+// ==================== تحويلات المخزون بين الفروع ====================
+model StockTransfer {
+  id              String   @id @default(cuid())
+  transferNumber  String   @unique
+  fromBranchId    String
+  toBranchId      String
+  status          StockTransferStatus @default(PENDING)
+  
+  // معلومات إضافية
+  notes           String?
+  totalItems      Int      @default(0)
+  totalQuantity   Float    @default(0)
+  totalValue      Float    @default(0)
+  
+  // التواريخ
+  requestedAt     DateTime @default(now())
+  approvedAt      DateTime?
+  shippedAt       DateTime?
+  receivedAt      DateTime?
+  
+  // المستخدمين
+  requestedBy     String   // userId
+  approvedBy      String?  // userId
+  shippedBy       String?  // userId
+  receivedBy      String?  // userId
+  
+  // أسباب الرفض أو الإلغاء
+  rejectionReason String?
+  cancellationReason String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  items           StockTransferItem[]
+  
+  @@index([fromBranchId])
+  @@index([toBranchId])
+  @@index([status])
+}
+
+enum StockTransferStatus {
+  PENDING       // قيد الانتظار
+  APPROVED      // تم الاعتماد
+  REJECTED      // مرفوض
+  IN_TRANSIT    // قيد النقل
+  RECEIVED      // تم الاستلام
+  PARTIAL       // استلام جزئي
+  CANCELLED     // ملغي
+}
+
+model StockTransferItem {
+  id              String   @id @default(cuid())
+  transferId      String
+  productId       String
+  variationId     String?  // للمتغيرات
+  
+  // الكميات
+  requestedQty    Float    @default(0)
+  approvedQty     Float?
+  shippedQty      Float?
+  receivedQty     Float?
+  
+  // الأسعار
+  unitCost        Float    @default(0)
+  totalCost       Float    @default(0)
+  
+  // ملاحظات
+  notes           String?
+  discrepancyQty  Float?   // فرق الكمية
+  discrepancyReason String? // سبب الفرق
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  transfer        StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product         Product @relation(fields: [productId], references: [id])
+  
+  @@index([transferId])
+  @@index([productId])
+}
+
+// ==================== نظام الولاء ====================
+model LoyaltyTier {
+  id            String   @id @default(cuid())
+  name          String
+  nameAr        String
+  level         Int      @default(1)       // مستوى الولاء (1, 2, 3, ...)
+  minPoints     Int      @default(0)       // الحد الأدنى من النقاط
+  maxPoints     Int?                       // الحد الأقصى (null = لا نهائي)
+  
+  // المزايا
+  discountPercent Float   @default(0)      // نسبة الخصم
+  pointsMultiplier Float  @default(1)      // مضاعف النقاط
+  freeShipping    Boolean @default(false)  // شحن مجاني
+  specialOffers   Boolean @default(false)  // عروض خاصة
+  
+  // الشكل
+  color         String   @default("#3b82f6")
+  icon          String?
+  
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  customers     CustomerLoyalty[]
+  
+  @@index([level])
+}
+
+model CustomerLoyalty {
+  id            String   @id @default(cuid())
+  customerId    String   @unique
+  tierId        String?
+  
+  // النقاط
+  totalPoints   Int      @default(0)       // إجمالي النقاط المكتسبة
+  availablePoints Int    @default(0)       // النقاط المتاحة للاستخدام
+  usedPoints    Int      @default(0)       // النقاط المستخدمة
+  expiredPoints Int      @default(0)       // النقاط المنتهية
+  
+  // الإحصائيات
+  totalPurchases Float   @default(0)       // إجمالي المشتريات
+  totalVisits    Int      @default(0)       // عدد الزيارات
+  lastVisitAt    DateTime?
+  
+  // تواريخ النقاط
+  pointsExpiryAt DateTime?                // تاريخ انتهاء النقاط
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tier          LoyaltyTier? @relation(fields: [tierId], references: [id])
+  transactions  LoyaltyTransaction[]
+  
+  @@index([customerId])
+  @@index([tierId])
+}
+
+model LoyaltyTransaction {
+  id            String   @id @default(cuid())
+  customerId    String
+  invoiceId     String?
+  
+  // نوع المعاملة
+  type          LoyaltyTransactionType
+  
+  // النقاط
+  points        Int                       // عدد النقاط
+  balanceBefore Int                       // الرصيد قبل
+  balanceAfter  Int                       // الرصيد بعد
+  
+  // التفاصيل
+  description   String?
+  
+  // انتهاء الصلاحية
+  expiresAt     DateTime?
+  
+  createdAt     DateTime @default(now())
+  
+  customer      CustomerLoyalty @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  @@index([customerId])
+  @@index([type])
+}
+
+enum LoyaltyTransactionType {
+  EARN          // كسب نقاط
+  REDEEM        // استبدال نقاط
+  EXPIRE        // انتهاء صلاحية
+  BONUS         // نقاط مكافأة
+  ADJUST        // تعديل يدوي
+  REFUND        // استرداد
+}
+
+// ==================== إعدادات برنامج الولاء ====================
+model LoyaltySetting {
+  id                    String   @id @default(cuid())
+  
+  // تفعيل البرنامج
+  isEnabled             Boolean  @default(false)
+  
+  // نسبة التحويل
+  pointsPerCurrency     Float    @default(1)    // نقطة لكل وحدة عملة
+  currencyPerPoint      Float    @default(0.1)  // قيمة النقطة بالعملة
+  
+  // الحد الأدنى للاستبدال
+  minRedeemPoints       Int      @default(100)
+  maxRedeemPercent      Float    @default(50)   // أقصى نسبة للخصم
+  
+  // صلاحية النقاط
+  pointsValidityDays    Int      @default(365)  // صلاحية النقاط بالأيام
+  
+  // نقاط الترحيب
+  welcomeBonusPoints    Int      @default(0)
+  
+  // نقاط عيد الميلاد
+  birthdayBonusPoints   Int      @default(0)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ==================== التقارير المجدولة ====================
+model ScheduledReport {
+  id            String   @id @default(cuid())
+  name          String
+  nameAr        String?
+  description   String?
+  
+  // نوع التقرير
+  reportType    String   // sales, products, inventory, shifts, expenses, customers
+  
+  // الفترة الزمنية
+  scheduleType  ScheduleType
+  time          String   // HH:mm format
+  dayOfWeek     Int?     // 0-6 for weekly
+  dayOfMonth    Int?     // 1-31 for monthly
+  
+  // الفلاتر
+  filters       String?  // JSON
+  
+  // التنسيق
+  format        ReportFormat @default(PDF)
+  
+  // المستلمين
+  recipients    String   // comma-separated emails
+  
+  // الحالة
+  isActive      Boolean  @default(true)
+  lastRunAt     DateTime?
+  nextRunAt     DateTime?
+  
+  // تاريخ الإنشاء
+  createdById   String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([reportType])
+  @@index([isActive])
+}
+
+enum ScheduleType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum ReportFormat {
+  PDF
+  EXCEL
+  CSV
+}
+
+// ==================== سجل التقارير ====================
+model ReportExecution {
+  id              String   @id @default(cuid())
+  scheduledReportId String?
+  
+  // معلومات التقرير
+  reportType      String
+  parameters      String?  // JSON
+  
+  // النتيجة
+  status          ExecutionStatus
+  fileUrl         String?
+  fileSize        Int?
+  recordCount     Int?
+  
+  // التوقيت
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  duration        Int?     // milliseconds
+  
+  // الأخطاء
+  errorMessage    String?
+  
+  // من قام بالتنفيذ
+  executedBy      String?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([reportType])
+  @@index([status])
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// ==================== العروض والخصومات التلقائية ====================
+model Offer {
+  id              String   @id @default(cuid())
+  name            String
+  nameAr          String?
+  description     String?
+  descriptionAr   String?
+  
+  // نوع العرض
+  type            OfferType
+  
+  // القيمة
+  discountType    DiscountType      // percentage, fixed
+  discountValue   Float             @default(0)
+  maxDiscount     Float?            // أقصى قيمة للخصم
+  
+  // الفترة الزمنية
+  startDate       DateTime
+  endDate         DateTime
+  
+  // شروط العرض
+  minPurchase     Float?            // الحد الأدنى للمشتريات
+  minQuantity     Int?              // الحد الأدنى للكمية
+  maxUses         Int?              // أقصى عدد استخدامات
+  maxUsesPerUser  Int?              // أقصى استخدامات لكل عميل
+  currentUses     Int               @default(0)
+  
+  // المنتجات المشمولة
+  appliesTo       ApplyType         @default(ALL)
+  productIds      String?           // JSON array
+  categoryIds     String?           // JSON array
+  brandIds        String?           // JSON array
+  
+  // الفروع
+  branchIds       String?           // JSON array, null = all branches
+  
+  // أولوية العرض
+  priority        Int               @default(0)
+  
+  // هل يمكن دمجه مع عروض أخرى
+  isCombinable    Boolean           @default(false)
+  
+  // العملاء المستهدفون
+  targetCustomers CustomerTarget    @default(ALL)
+  tierIds         String?           // JSON array for loyalty tiers
+  
+  // أيام الأسبوع
+  activeDays      String?           // JSON array [0,1,2,3,4,5,6]
+  
+  // أوقات العمل
+  startTime       String?           // HH:mm
+  endTime         String?           // HH:mm
+  
+  // الحالة
+  isActive        Boolean           @default(true)
+  isAutoApplied   Boolean           @default(true)  // تطبيق تلقائي بدون كود
+  
+  // كود الخصم (اختياري)
+  code            String?           @unique
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  items           OfferItem[]
+  usages          OfferUsage[]
+  
+  @@index([type])
+  @@index([isActive])
+  @@index([startDate, endDate])
+}
+
+enum OfferType {
+  PRODUCT_DISCOUNT     // خصم على منتج
+  CATEGORY_DISCOUNT    // خصم على فئة
+  CART_DISCOUNT        // خصم على السلة
+  BUY_X_GET_Y          // اشتري X واحصل على Y
+  BUNDLE               // حزمة منتجات
+  FLASH_SALE           // عرض سريع
+  SEASONAL             // عرض موسمي
+  LOYALTY              // عرض للعملاء المميزين
+  FIRST_PURCHASE       // أول عملية شراء
+}
+
+enum DiscountType {
+  PERCENTAGE           // نسبة مئوية
+  FIXED                // مبلغ ثابت
+}
+
+enum ApplyType {
+  ALL                  // جميع المنتجات
+  PRODUCTS             // منتجات محددة
+  CATEGORIES           // فئات محددة
+  BRANDS               // براندات محددة
+}
+
+enum CustomerTarget {
+  ALL                  // جميع العملاء
+  NEW                  // عملاء جدد
+  RETURNING            // عملاء عائدون
+  LOYALTY_TIERS        // مستويات ولاء محددة
+}
+
+model OfferItem {
+  id              String   @id @default(cuid())
+  offerId         String
+  productId       String
+  variationId     String?
+  
+  // خصم خاص للمنتج
+  discountValue   Float?
+  discountType    DiscountType?
+  
+  // للعروض من نوع Buy X Get Y
+  requiredQty     Int      @default(1)
+  freeQty         Int      @default(0)
+  freeProductId   String?
+  freeVariationId String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  offer           Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  
+  @@index([offerId])
+  @@index([productId])
+}
+
+model OfferUsage {
+  id              String   @id @default(cuid())
+  offerId         String
+  invoiceId       String
+  customerId      String?
+  userId          String
+  
+  // تفاصيل الاستخدام
+  discountAmount  Float    @default(0)
+  itemsCount      Int      @default(0)
+  
+  // الكود المستخدم
+  codeUsed        String?
+  
+  createdAt       DateTime @default(now())
+  
+  offer           Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  
+  @@index([offerId])
+  @@index([customerId])
+  @@index([invoiceId])
+}
+
+// ==================== الجرد الدوري ====================
+model InventoryCount {
+  id              String   @id @default(cuid())
+  countNumber     String   @unique
+  branchId        String
+  
+  // نوع الجرد
+  countType       CountType
+  status          CountStatus @default(DRAFT)
+  
+  // الفترة
+  scheduledDate   DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  // المستخدمين
+  createdBy       String
+  approvedBy      String?
+  completedBy     String?
+  
+  // الملخص
+  totalItems      Int      @default(0)
+  countedItems    Int      @default(0)
+  discrepancyItems Int     @default(0)
+  totalValue      Float    @default(0)
+  discrepancyValue Float   @default(0)
+  
+  // ملاحظات
+  notes           String?
+  approvalNotes   String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  items           InventoryCountItem[]
+  
+  @@index([branchId])
+  @@index([status])
+}
+
+enum CountType {
+  FULL            // جرد شامل
+  PARTIAL         // جرد جزئي
+  CYCLE           // جرد دوري
+  SPOT            // جرد مفاجئ
+}
+
+enum CountStatus {
+  DRAFT           // مسودة
+  SCHEDULED       // مجدول
+  IN_PROGRESS     // جاري
+  PENDING_REVIEW  // في انتظار المراجعة
+  APPROVED        // معتمد
+  COMPLETED       // مكتمل
+  CANCELLED       // ملغي
+}
+
+model InventoryCountItem {
+  id              String   @id @default(cuid())
+  countId         String
+  productId       String
+  variationId     String?
+  
+  // الكميات
+  systemQty       Float    @default(0)    // الكمية في النظام
+  countedQty      Float?                  // الكمية الفعلية
+  discrepancyQty  Float?                  // الفرق
+  
+  // الأسعار
+  unitCost        Float    @default(0)
+  discrepancyValue Float   @default(0)
+  
+  // الحالة
+  status          ItemCountStatus @default(PENDING)
+  
+  // من قام بالعد
+  countedBy       String?
+  countedAt       DateTime?
+  
+  // ملاحظات
+  notes           String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  count           InventoryCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  
+  @@index([countId])
+  @@index([productId])
+  @@unique([countId, productId, variationId])
+}
+
+enum ItemCountStatus {
+  PENDING         // في الانتظار
+  COUNTED         // تم العد
+  VERIFIED        // تم التحقق
+  ADJUSTED        // تم التعديل
+}
+
+model InventoryAdjustment {
+  id              String   @id @default(cuid())
+  adjustmentNumber String  @unique
+  branchId        String
+  
+  // السبب
+  reason          AdjustmentReason
+  reference       String?    // رقم مرجعي
+  notes           String?
+  
+  // القيم
+  totalItems      Int      @default(0)
+  totalValue      Float    @default(0)
+  
+  // المستخدمين
+  createdBy       String
+  approvedBy      String?
+  
+  // التواريخ
+  adjustmentDate  DateTime @default(now())
+  approvedAt      DateTime?
+  
+  status          AdjustmentStatus @default(PENDING)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  items           InventoryAdjustmentItem[]
+  
+  @@index([branchId])
+  @@index([status])
+}
+
+enum AdjustmentReason {
+  INVENTORY_COUNT  // جرد
+  DAMAGE           // تلف
+  THEFT            // سرقة
+  EXPIRY           // انتهاء صلاحية
+  RETURN_TO_SUPPLIER // إرجاع للمورد
+  SAMPLE           // عينات
+  INTERNAL_USE     // استخدام داخلي
+  ERROR_CORRECTION // تصحيح خطأ
+  OTHER            // أخرى
+}
+
+enum AdjustmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model InventoryAdjustmentItem {
+  id              String   @id @default(cuid())
+  adjustmentId    String
+  productId       String
+  variationId     String?
+  
+  // الكميات
+  previousQty     Float    @default(0)
+  adjustmentQty   Float    @default(0)
+  newQty          Float    @default(0)
+  
+  // القيم
+  unitCost        Float    @default(0)
+  adjustmentValue Float    @default(0)
+  
+  notes           String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  adjustment      InventoryAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  
+  @@index([adjustmentId])
+  @@index([productId])
+}
+
+// ==================== نظام المشتريات ====================
+model PurchaseOrder {
+  id              String   @id @default(cuid())
+  orderNumber     String   @unique
+  supplierId      String
+  branchId        String?
+  
+  // الحالة
+  status          PurchaseStatus @default(DRAFT)
+  
+  // التواريخ
+  orderDate       DateTime @default(now())
+  expectedDate    DateTime?
+  receivedDate    DateTime?
+  
+  // القيم
+  subtotal        Float    @default(0)
+  taxAmount       Float    @default(0)
+  shippingCost    Float    @default(0)
+  discountAmount  Float    @default(0)
+  totalAmount     Float    @default(0)
+  paidAmount      Float    @default(0)
+  
+  // المستخدمين
+  createdBy       String
+  approvedBy      String?
+  receivedBy      String?
+  
+  // ملاحظات
+  notes           String?
+  supplierNotes   String?
+  internalNotes   String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  items           PurchaseOrderItem[]
+  payments        PurchasePayment[]
+  
+  @@index([supplierId])
+  @@index([status])
+}
+
+enum PurchaseStatus {
+  DRAFT           // مسودة
+  PENDING         // في الانتظار
+  APPROVED        // معتمد
+  ORDERED         // تم الطلب
+  PARTIAL         // استلام جزئي
+  RECEIVED        // تم الاستلام
+  CANCELLED       // ملغي
+}
+
+model PurchaseOrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  productId       String?
+  variationId     String?
+  
+  // المنتج (يمكن إضافة منتج جديد)
+  productName     String
+  productBarcode  String?
+  sku             String?
+  
+  // الكميات
+  orderedQty      Float    @default(0)
+  receivedQty     Float    @default(0)
+  pendingQty      Float    @default(0)
+  
+  // الأسعار
+  unitCost        Float    @default(0)
+  subtotal        Float    @default(0)
+  taxRate         Float    @default(0)
+  taxAmount       Float    @default(0)
+  discountPercent Float    @default(0)
+  totalAmount     Float    @default(0)
+  
+  // تاريخ الاستلام المتوقع
+  expectedDate    DateTime?
+  
+  notes           String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  order           PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@index([orderId])
+  @@index([productId])
+}
+
+model PurchasePayment {
+  id              String   @id @default(cuid())
+  orderId         String
+  paymentMethodId String?
+  
+  amount          Float    @default(0)
+  reference       String?
+  notes           String?
+  paymentDate     DateTime @default(now())
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  order           PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@index([orderId])
+}
+
+// ==================== استلام المشتريات ====================
+model GoodsReceipt {
+  id              String   @id @default(cuid())
+  receiptNumber   String   @unique
+  purchaseOrderId String?
+  supplierId      String
+  branchId        String?
+  
+  // الحالة
+  status          ReceiptStatus @default(DRAFT)
+  
+  // التواريخ
+  receiptDate     DateTime @default(now())
+  
+  // القيم
+  subtotal        Float    @default(0)
+  taxAmount       Float    @default(0)
+  totalAmount     Float    @default(0)
+  
+  // المستخدمين
+  receivedBy      String
+  approvedBy      String?
+  
+  // ملاحظات
+  notes           String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  items           GoodsReceiptItem[]
+  
+  @@index([purchaseOrderId])
+  @@index([supplierId])
+  @@index([status])
+}
+
+enum ReceiptStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  CANCELLED
+}
+
+model GoodsReceiptItem {
+  id              String   @id @default(cuid())
+  receiptId       String
+  productId       String?
+  variationId     String?
+  purchaseOrderItemId String?
+  
+  // المنتج
+  productName     String
+  productBarcode  String?
+  
+  // الكميات
+  orderedQty      Float    @default(0)
+  receivedQty     Float    @default(0)
+  acceptedQty     Float    @default(0)
+  rejectedQty     Float    @default(0)
+  
+  // سبب الرفض
+  rejectionReason String?
+  
+  // الأسعار
+  unitCost        Float    @default(0)
+  totalAmount     Float    @default(0)
+  
+  notes           String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  receipt         GoodsReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  
+  @@index([receiptId])
+  @@index([productId])
 }

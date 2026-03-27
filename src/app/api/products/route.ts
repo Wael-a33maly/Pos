@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+// Force rebuild v3
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -32,6 +34,10 @@ export async function GET(request: NextRequest) {
           brand: true,
           supplier: true,
           variants: { where: { isActive: true } },
+          variations: { 
+            where: { isActive: true },
+            orderBy: { sortOrder: 'asc' }
+          },
           inventory: branchId ? { where: { branchId } } : true,
         },
         skip,
@@ -51,29 +57,60 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const { variations, ...productData } = body;
+    
     const product = await db.product.create({
       data: {
-        barcode: body.barcode,
-        sku: body.sku,
-        name: body.name,
-        nameAr: body.nameAr,
-        description: body.description,
-        categoryId: body.categoryId,
-        brandId: body.brandId,
-        supplierId: body.supplierId,
-        branchId: body.branchId,
-        costPrice: body.costPrice || 0,
-        sellingPrice: body.sellingPrice || 0,
-        wholesalePrice: body.wholesalePrice,
-        minStock: body.minStock || 0,
-        maxStock: body.maxStock,
-        unit: body.unit || 'piece',
-        image: body.image,
-        hasVariants: body.hasVariants || false,
-        isActive: body.isActive ?? true,
+        barcode: productData.barcode,
+        sku: productData.sku,
+        name: productData.name,
+        nameAr: productData.nameAr,
+        description: productData.description,
+        categoryId: productData.categoryId,
+        brandId: productData.brandId,
+        supplierId: productData.supplierId,
+        branchId: productData.branchId,
+        costPrice: productData.costPrice || 0,
+        sellingPrice: productData.sellingPrice || 0,
+        wholesalePrice: productData.wholesalePrice,
+        minStock: productData.minStock || 0,
+        maxStock: productData.maxStock,
+        unit: productData.unit || 'piece',
+        image: productData.image,
+        hasVariants: productData.hasVariants || false,
+        isStockTracked: productData.isStockTracked ?? true,
+        isActive: productData.isActive ?? true,
       },
-      include: { category: true, brand: true, variants: true },
+      include: { 
+        category: true, 
+        brand: true, 
+        variants: true,
+      },
     });
+    
+    // Create variations separately if provided
+    if (variations && variations.length > 0) {
+      try {
+        for (let i = 0; i < variations.length; i++) {
+          const v = variations[i];
+          await db.productVariation.create({
+            data: {
+              productId: product.id,
+              price: v.price,
+              name: v.name,
+              barcode: v.barcode,
+              stock: v.stock || 0,
+              isStockTracked: v.isStockTracked ?? true,
+              sortOrder: i,
+            },
+          });
+        }
+      } catch (varError) {
+        console.error('Error creating variations:', varError);
+        // Continue even if variations fail
+      }
+    }
+    
     return NextResponse.json({ product }, { status: 201 });
   } catch (error: any) {
     console.error('Create product error:', error);

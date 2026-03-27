@@ -57,6 +57,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAppStore } from '@/store';
 import { cn } from '@/lib/utils';
+import { clearCurrencyCache } from '@/lib/currency';
 import type { PaymentMethod, Branch } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -76,9 +77,10 @@ const settingsTabs = [
 export function UnifiedSettingsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { theme, setTheme } = useAppStore();
+  const { theme, setTheme, setCurrency, setDecimalPlaces } = useAppStore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   const activeTab = useMemo(() => {
     const tab = searchParams.get('tab');
@@ -89,7 +91,138 @@ export function UnifiedSettingsPage() {
   const handleTabChange = (tab: string) => {
     router.push(`/?page=settings&tab=${tab}`);
   };
-  
+
+  // Load settings from API on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch('/api/settings');
+        if (res.ok) {
+          const data = await res.json();
+          const settingsData = data.settings || {};
+
+          // Update settings state
+          setSettings(prev => ({
+            ...prev,
+            companyName: settingsData.companyName || settingsData.company_name || prev.companyName,
+            companyNameAr: settingsData.companyNameAr || settingsData.company_name_ar || prev.companyNameAr,
+            companyPhone: settingsData.companyPhone || settingsData.company_phone || prev.companyPhone,
+            companyEmail: settingsData.companyEmail || settingsData.company_email || prev.companyEmail,
+            companyAddress: settingsData.companyAddress || settingsData.company_address || prev.companyAddress,
+            taxNumber: settingsData.taxNumber || settingsData.tax_number || prev.taxNumber,
+            defaultCurrency: settingsData.defaultCurrency || prev.defaultCurrency,
+            decimalPlaces: parseInt(settingsData.decimalPlaces || settingsData.decimal_places) || prev.decimalPlaces,
+            invoicePrefix: settingsData.invoicePrefix || settingsData.invoice_prefix || prev.invoicePrefix,
+            invoiceStartNumber: parseInt(settingsData.invoiceStartNumber) || prev.invoiceStartNumber,
+            showTaxOnInvoice: settingsData.showTaxOnInvoice === 'true',
+            showLogoOnInvoice: settingsData.showLogoOnInvoice === 'true',
+            invoiceNotes: settingsData.invoiceNotes || settingsData.invoice_notes || prev.invoiceNotes,
+            defaultPaymentMethod: settingsData.defaultPaymentMethod || prev.defaultPaymentMethod,
+            askForCustomer: settingsData.askForCustomer === 'true',
+            printAfterSale: settingsData.printAfterSale === 'true',
+            soundEnabled: settingsData.soundEnabled === 'true',
+            lowStockAlert: settingsData.lowStockAlert === 'true',
+            lowStockThreshold: parseInt(settingsData.lowStockThreshold) || prev.lowStockThreshold,
+            dailyReportEmail: settingsData.dailyReportEmail === 'true',
+            reportEmail: settingsData.reportEmail || '',
+            language: settingsData.language || prev.language,
+            timezone: settingsData.timezone || prev.timezone,
+            startDate: settingsData.startDate || '',
+            showDiscount: settingsData.showDiscount === 'true' || prev.showDiscount,
+            allowMultiPayment: settingsData.allowMultiPayment === 'true' || prev.allowMultiPayment,
+          }));
+
+          // Update company logo
+          if (settingsData.companyLogo && settingsData.companyLogo !== 'null') {
+            setCompanyLogo(settingsData.companyLogo);
+          }
+
+          // Load currencies
+          if (settingsData.currencies) {
+            try {
+              const currenciesData = typeof settingsData.currencies === 'string'
+                ? JSON.parse(settingsData.currencies)
+                : settingsData.currencies;
+              if (Array.isArray(currenciesData) && currenciesData.length > 0) {
+                setCurrencies(currenciesData);
+
+                // Update store with default currency
+                const defaultCurr = currenciesData.find((c: { isDefault?: boolean; code?: string }) =>
+                  c.isDefault || c.code === settingsData.defaultCurrency
+                );
+                if (defaultCurr) {
+                  setCurrency(defaultCurr);
+                  setDecimalPlaces(defaultCurr.decimalPlaces || 2);
+                }
+              }
+            } catch (e) {
+              console.error('Failed to parse currencies:', e);
+            }
+          }
+
+          // Load payment methods
+          if (settingsData.paymentMethods) {
+            try {
+              const pmData = typeof settingsData.paymentMethods === 'string'
+                ? JSON.parse(settingsData.paymentMethods)
+                : settingsData.paymentMethods;
+              if (Array.isArray(pmData) && pmData.length > 0) {
+                setPaymentMethods(pmData);
+              }
+            } catch (e) {
+              console.error('Failed to parse payment methods:', e);
+            }
+          }
+
+          // Load branches
+          if (settingsData.branches) {
+            try {
+              const branchData = typeof settingsData.branches === 'string'
+                ? JSON.parse(settingsData.branches)
+                : settingsData.branches;
+              if (Array.isArray(branchData) && branchData.length > 0) {
+                setBranches(branchData);
+              }
+            } catch (e) {
+              console.error('Failed to parse branches:', e);
+            }
+          }
+
+          // Load print settings
+          if (settingsData.printSettings) {
+            try {
+              const psData = typeof settingsData.printSettings === 'string'
+                ? JSON.parse(settingsData.printSettings)
+                : settingsData.printSettings;
+              setPrintSettings(psData);
+            } catch (e) {
+              console.error('Failed to parse print settings:', e);
+            }
+          }
+
+          // Load barcode settings
+          if (settingsData.barcodeSettings) {
+            try {
+              const bsData = typeof settingsData.barcodeSettings === 'string'
+                ? JSON.parse(settingsData.barcodeSettings)
+                : settingsData.barcodeSettings;
+              setBarcodeSettings(bsData);
+            } catch (e) {
+              console.error('Failed to parse barcode settings:', e);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSettings();
+  }, [setCurrency, setDecimalPlaces]);
+
   // Settings State
   const [settings, setSettings] = useState({
     companyName: 'شركة نقاط البيع',
@@ -167,13 +300,16 @@ export function UnifiedSettingsPage() {
     marginBottom: 10,
   });
 
-  // Currencies State
-  const [currencies, setCurrencies] = useState([
-    { id: '1', name: 'Saudi Riyal', nameAr: 'ريال سعودي', code: 'SAR', symbol: 'ر.س', decimalPlaces: 2, isDefault: true, isActive: true },
+  // Default currencies for fallback
+  const currenciesDefault = [
+    { id: '1', name: 'Saudi Riyal', nameAr: 'ريال سعودي', code: 'SAR', symbol: 'ر.س', decimalPlaces: 2, isDefault: false, isActive: true },
     { id: '2', name: 'UAE Dirham', nameAr: 'درهم إماراتي', code: 'AED', symbol: 'د.إ', decimalPlaces: 2, isDefault: false, isActive: true },
-    { id: '3', name: 'Egyptian Pound', nameAr: 'جنيه مصري', code: 'EGP', symbol: 'ج.م', decimalPlaces: 2, isDefault: false, isActive: true },
+    { id: '3', name: 'Egyptian Pound', nameAr: 'جنيه مصري', code: 'EGP', symbol: 'ج.م', decimalPlaces: 2, isDefault: true, isActive: true },
     { id: '4', name: 'US Dollar', nameAr: 'دولار أمريكي', code: 'USD', symbol: '$', decimalPlaces: 2, isDefault: false, isActive: true },
-  ]);
+  ];
+
+  // Currencies State - empty initially, loaded from API
+  const [currencies, setCurrencies] = useState(currenciesDefault);
   const [showCurrencyDialog, setShowCurrencyDialog] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<typeof currencies[0] | null>(null);
   const [currencyFormData, setCurrencyFormData] = useState({
@@ -206,10 +342,20 @@ export function UnifiedSettingsPage() {
   };
 
   const handleSetDefaultCurrency = (id: string) => {
-    setCurrencies(prev => prev.map(c => ({
-      ...c,
-      isDefault: c.id === id,
-    })));
+    setCurrencies(prev => {
+      const updated = prev.map(c => ({
+        ...c,
+        isDefault: c.id === id,
+      }));
+      // Find the new default currency and update store
+      const newDefault = updated.find(c => c.isDefault);
+      if (newDefault) {
+        setCurrency(newDefault);
+        setDecimalPlaces(newDefault.decimalPlaces || 2);
+        clearCurrencyCache();
+      }
+      return updated;
+    });
     const defaultCurrency = currencies.find(c => c.id === id);
     if (defaultCurrency) {
       setSettings(prev => ({ ...prev, defaultCurrency: defaultCurrency.code }));
@@ -410,10 +556,24 @@ export function UnifiedSettingsPage() {
       });
 
       if (response.ok) {
+        // Update store with the new default currency
+        const defaultCurr = currencies.find(c => c.isDefault);
+        if (defaultCurr) {
+          setCurrency(defaultCurr);
+          setDecimalPlaces(defaultCurr.decimalPlaces || 2);
+        }
+        // Clear currency cache so other components get the new currency
+        clearCurrencyCache();
+
         toast({
           title: 'تم الحفظ بنجاح',
-          description: 'تم حفظ جميع الإعدادات بنجاح',
+          description: 'جاري إعادة تحميل الصفحة لتطبيق التغييرات...',
         });
+
+        // Reload the page to apply changes
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       } else {
         throw new Error('Failed to save');
       }
@@ -427,6 +587,28 @@ export function UnifiedSettingsPage() {
       setIsSaving(false);
     }
   };
+
+  // Show loading state while fetching settings
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5"
+          >
+            <SettingsIcon className="h-8 w-8 text-primary" />
+          </motion.div>
+          <p className="text-muted-foreground">جاري تحميل الإعدادات...</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">

@@ -7,7 +7,7 @@ import type { Currency } from '@/types';
 
 // Default currency settings
 export const DEFAULT_CURRENCY: Currency = {
-  id: 'default',
+  id: 'egp',
   name: 'Egyptian Pound',
   nameAr: 'جنيه مصري',
   code: 'EGP',

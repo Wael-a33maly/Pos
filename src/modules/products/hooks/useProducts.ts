@@ -10,7 +10,8 @@ import type {
   Brand, 
   Supplier, 
   ProductFormData, 
-  VariantFormData 
+  VariantFormData,
+  VariationFormData 
 } from '../types';
 
 interface UseProductsReturn {
@@ -27,7 +28,7 @@ interface UseProductsReturn {
   setSearchQuery: (query: string) => void;
   setSelectedCategory: (category: string) => void;
   fetchData: () => Promise<void>;
-  saveProduct: (data: ProductFormData, variants: VariantFormData[], selectedProduct: Product | null) => Promise<boolean>;
+  saveProduct: (data: ProductFormData, variations: VariationFormData[], selectedProduct: Product | null) => Promise<boolean>;
   deleteProduct: (productId: string) => Promise<boolean>;
   
   // Computed
@@ -95,18 +96,32 @@ export function useProducts(): UseProductsReturn {
   const stats = useMemo(() => ({
     totalProducts: products.length,
     activeProducts: products.filter(p => p.isActive).length,
-    lowStockProducts: products.filter(p => p.stock !== undefined && p.stock <= p.minStock).length,
-    productsWithVariants: products.filter(p => p.hasVariants).length,
+    lowStockProducts: products.filter(p => p.inventory && p.inventory.some(inv => inv.quantity <= (p.minStock || 0))).length,
+    productsWithVariants: products.filter(p => p.variations && p.variations.length > 0).length,
   }), [products]);
+
+  // توليد باركود للمتغير
+  const generateVariationBarcode = useCallback((productBarcode: string, index: number): string => {
+    return `${productBarcode}-${index + 1}`;
+  }, []);
 
   // Save product (create or update)
   const saveProduct = useCallback(async (
     data: ProductFormData, 
-    variants: VariantFormData[], 
+    variations: VariationFormData[], 
     selectedProduct: Product | null
   ): Promise<boolean> => {
     try {
-      const payload = { ...data, variants: data.hasVariants ? variants : undefined };
+      // إضافة باركود للمتغيرات التي ليس لها باركود
+      const variationsWithBarcode = variations.map((v, i) => ({
+        ...v,
+        barcode: v.barcode || generateVariationBarcode(data.barcode, i)
+      }));
+      
+      const payload = { 
+        ...data, 
+        variations: data.hasVariants ? variationsWithBarcode : undefined 
+      };
       
       if (selectedProduct) {
         const response = await fetch(`/api/products/${selectedProduct.id}`, {
@@ -114,7 +129,10 @@ export function useProducts(): UseProductsReturn {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error('فشل في التحديث');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'فشل في التحديث');
+        }
         toast.success('تم تحديث المنتج بنجاح');
       } else {
         const response = await fetch('/api/products', {
@@ -122,7 +140,10 @@ export function useProducts(): UseProductsReturn {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error('فشل في الإنشاء');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'فشل في الإنشاء');
+        }
         toast.success('تم إنشاء المنتج بنجاح');
       }
       
@@ -132,7 +153,7 @@ export function useProducts(): UseProductsReturn {
       toast.error(error.message || 'حدث خطأ');
       return false;
     }
-  }, [fetchData]);
+  }, [fetchData, generateVariationBarcode]);
 
   // Delete product
   const deleteProduct = useCallback(async (productId: string): Promise<boolean> => {

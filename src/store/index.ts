@@ -270,8 +270,9 @@ export const useAppStore = create<AppState>()(
         currentBranch: state.currentBranch,
         theme: state.theme,
         sidebarCollapsed: state.sidebarCollapsed,
-        currency: state.currency,
-        decimalPlaces: state.decimalPlaces,
+        // Don't persist currency - always fetch from API
+        // currency: state.currency,
+        // decimalPlaces: state.decimalPlaces,
         pendingInvoices: state.pendingInvoices,
       }),
     }

@@ -11,7 +11,12 @@ export async function GET(
       where: { id },
       include: {
         category: true, brand: true, supplier: true,
-        variants: { where: { isActive: true } }, inventory: true,
+        variants: { where: { isActive: true } },
+        variations: { 
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' }
+        },
+        inventory: true,
       },
     });
     if (!product) return NextResponse.json({ error: 'المنتج غير موجود' }, { status: 404 });
@@ -25,16 +30,54 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
+    const { variations, ...productData } = body;
+    
+    // حذف المتغيرات القديمة وإنشاء الجديدة
+    if (variations !== undefined) {
+      await db.productVariation.deleteMany({
+        where: { productId: id }
+      });
+    }
+    
     const product = await db.product.update({
       where: { id },
       data: {
-        barcode: body.barcode, sku: body.sku, name: body.name, nameAr: body.nameAr,
-        description: body.description, categoryId: body.categoryId, brandId: body.brandId,
-        supplierId: body.supplierId, costPrice: body.costPrice, sellingPrice: body.sellingPrice,
-        wholesalePrice: body.wholesalePrice, minStock: body.minStock, maxStock: body.maxStock,
-        unit: body.unit, image: body.image, hasVariants: body.hasVariants, isActive: body.isActive,
+        barcode: productData.barcode, 
+        sku: productData.sku, 
+        name: productData.name, 
+        nameAr: productData.nameAr,
+        description: productData.description, 
+        categoryId: productData.categoryId, 
+        brandId: productData.brandId,
+        supplierId: productData.supplierId, 
+        costPrice: productData.costPrice, 
+        sellingPrice: productData.sellingPrice,
+        wholesalePrice: productData.wholesalePrice, 
+        minStock: productData.minStock, 
+        maxStock: productData.maxStock,
+        unit: productData.unit, 
+        image: productData.image, 
+        hasVariants: productData.hasVariants, 
+        isStockTracked: productData.isStockTracked ?? true,
+        isActive: productData.isActive,
+        // تحديث المتغيرات
+        variations: variations ? {
+          create: variations.map((v: any, index: number) => ({
+            price: v.price,
+            name: v.name,
+            barcode: v.barcode,
+            stock: v.stock || 0,
+            isStockTracked: v.isStockTracked ?? true,
+            sortOrder: index,
+          }))
+        } : undefined,
       },
-      include: { category: true, brand: true, variants: true },
+      include: { 
+        category: true, 
+        brand: true, 
+        variants: true,
+        variations: true 
+      },
     });
     return NextResponse.json({ product });
   } catch (error: any) {

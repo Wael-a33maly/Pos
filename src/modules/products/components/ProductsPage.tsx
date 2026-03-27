@@ -7,7 +7,7 @@
 import { useState, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plus, Search, Edit, Trash2, MoreHorizontal, Package, Filter, Download, Upload, QrCode, Eye, Copy, ChevronDown, X, Sparkles, TrendingUp, AlertCircle, Barcode
+  Plus, Search, Edit, Trash2, MoreHorizontal, Package, Filter, Download, Upload, QrCode, Eye, Copy, ChevronDown, X, Sparkles, TrendingUp, AlertCircle, Barcode, Tag, Warehouse
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAppStore, formatCurrency } from '@/store';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -38,17 +39,18 @@ import { cn } from '@/lib/utils';
 import { useProducts } from '../hooks';
 import { StatsCard } from './StatsCard';
 import { ProductSkeleton } from './ProductSkeleton';
-import type { Product, ProductFormData, VariantFormData } from '../types';
+import type { Product, ProductFormData, VariationFormData } from '../types';
 
 // Default form data
 const defaultFormData: ProductFormData = {
   barcode: '', sku: '', name: '', nameAr: '', description: '',
   categoryId: '', brandId: '', supplierId: '', costPrice: 0, sellingPrice: 0,
-  wholesalePrice: 0, minStock: 0, maxStock: 0, unit: 'piece', hasVariants: false, isActive: true
+  wholesalePrice: 0, minStock: 0, maxStock: 0, unit: 'piece', hasVariants: false, 
+  isStockTracked: true, isActive: true
 };
 
-const defaultVariant: VariantFormData = {
-  name: '', nameAr: '', sku: '', barcode: '', costPrice: 0, sellingPrice: 0, stock: 0, attributes: ''
+const defaultVariation: VariationFormData = {
+  price: 0, name: '', barcode: '', stock: 0, isStockTracked: true
 };
 
 export function ProductsPage() {
@@ -61,13 +63,13 @@ export function ProductsPage() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [expandedVariants, setExpandedVariants] = useState<string[]>([]);
+  const [expandedVariations, setExpandedVariations] = useState<string[]>([]);
   const [formData, setFormData] = useState<ProductFormData>(defaultFormData);
-  const [variants, setVariants] = useState<VariantFormData[]>([]);
+  const [variations, setVariations] = useState<VariationFormData[]>([]);
 
   // Handlers
   const handleSave = async () => {
-    const success = await saveProduct(formData, variants, selectedProduct);
+    const success = await saveProduct(formData, variations, selectedProduct);
     if (success) {
       setShowAddDialog(false);
       resetForm();
@@ -85,7 +87,7 @@ export function ProductsPage() {
 
   const resetForm = () => {
     setFormData(defaultFormData);
-    setVariants([]);
+    setVariations([]);
     setSelectedProduct(null);
   };
 
@@ -96,33 +98,53 @@ export function ProductsPage() {
       description: product.description || '', categoryId: product.categoryId || '', brandId: product.brandId || '',
       supplierId: product.supplierId || '', costPrice: product.costPrice, sellingPrice: product.sellingPrice,
       wholesalePrice: product.wholesalePrice || 0, minStock: product.minStock, maxStock: product.maxStock || 0,
-      unit: product.unit, hasVariants: product.hasVariants, isActive: product.isActive
+      unit: product.unit, hasVariants: product.hasVariants, isStockTracked: product.isStockTracked ?? true,
+      isActive: product.isActive
     });
-    if (product.variants && product.variants.length > 0) {
-      setVariants(product.variants.map(v => ({
-        name: v.name, nameAr: v.nameAr || '', sku: v.sku || '', barcode: v.barcode || '',
-        costPrice: v.costPrice, sellingPrice: v.sellingPrice, stock: v.stock, attributes: v.attributes || ''
+    // تحميل المتغيرات الجديدة
+    if (product.variations && product.variations.length > 0) {
+      setVariations(product.variations.map(v => ({
+        id: v.id,
+        price: v.price,
+        name: v.name || '',
+        barcode: v.barcode,
+        stock: v.stock,
+        isStockTracked: v.isStockTracked
       })));
+    } else {
+      setVariations([]);
     }
     setShowAddDialog(true);
   };
 
-  const addVariant = () => {
-    setVariants(prev => [...prev, { ...defaultVariant, costPrice: formData.costPrice, sellingPrice: formData.sellingPrice }]);
+  const addVariation = () => {
+    const newIndex = variations.length + 1;
+    const newBarcode = `${formData.barcode}-${newIndex}`;
+    setVariations(prev => [...prev, { 
+      ...defaultVariation, 
+      price: formData.sellingPrice,
+      barcode: newBarcode
+    }]);
   };
 
-  const removeVariant = (index: number) => {
-    setVariants(prev => prev.filter((_, i) => i !== index));
+  const removeVariation = (index: number) => {
+    setVariations(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updateVariant = (index: number, field: string, value: string | number) => {
-    setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+  const updateVariation = (index: number, field: string, value: string | number | boolean) => {
+    setVariations(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
   };
 
-  const toggleVariants = (productId: string) => {
-    setExpandedVariants(prev => 
+  const toggleVariations = (productId: string) => {
+    setExpandedVariations(prev => 
       prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
     );
+  };
+
+  // توليد باركود عشوائي
+  const generateBarcode = () => {
+    const barcode = Math.floor(100000000000 + Math.random() * 900000000000).toString();
+    setFormData(prev => ({ ...prev, barcode }));
   };
 
   if (loading) {
@@ -225,6 +247,7 @@ export function ProductsPage() {
                     <TableHead>سعر التكلفة</TableHead>
                     <TableHead>سعر البيع</TableHead>
                     <TableHead>المتغيرات</TableHead>
+                    <TableHead>المخزون</TableHead>
                     <TableHead>الحالة</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
@@ -232,14 +255,17 @@ export function ProductsPage() {
                 <TableBody>
                   <AnimatePresence mode="popLayout">
                     {filteredProducts.map((product) => {
-                      const hasVariants = product.variants && product.variants.length > 0;
-                      const isExpanded = expandedVariants.includes(product.id);
+                      const hasVariations = product.variations && product.variations.length > 0;
+                      const isExpanded = expandedVariations.includes(product.id);
+                      const totalVariationStock = hasVariations 
+                        ? product.variations!.filter(v => v.isStockTracked).reduce((sum, v) => sum + v.stock, 0)
+                        : 0;
                       
                       return (
                         <Fragment key={product.id}>
                           <TableRow 
                             className="cursor-pointer hover:bg-muted/30 transition-colors"
-                            onClick={() => toggleVariants(product.id)}
+                            onClick={() => hasVariations && toggleVariations(product.id)}
                           >
                             <TableCell>
                               <div className="flex items-center gap-3">
@@ -276,14 +302,26 @@ export function ProductsPage() {
                             <TableCell>{formatCurrency(product.costPrice, currency)}</TableCell>
                             <TableCell className="font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(product.sellingPrice, currency)}</TableCell>
                             <TableCell>
-                              {hasVariants ? (
+                              {hasVariations ? (
                                 <div className="flex items-center gap-1">
-                                  <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/20">{product.variants?.length} متغير</Badge>
+                                  <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/20">{product.variations?.length} سعر</Badge>
                                   <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
                                     <ChevronDown className="h-4 w-4" />
                                   </motion.div>
                                 </div>
                               ) : '-'}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                {!product.isStockTracked ? (
+                                  <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-600">
+                                    <Warehouse className="h-3 w-3 ml-1" />
+                                    مفتوح
+                                  </Badge>
+                                ) : hasVariations ? (
+                                  <span className="text-sm">{totalVariationStock}</span>
+                                ) : '-'}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <Badge variant={product.isActive ? 'default' : 'secondary'} className={cn(product.isActive && "bg-emerald-500 hover:bg-emerald-600")}>
@@ -316,35 +354,39 @@ export function ProductsPage() {
                             </TableCell>
                           </TableRow>
                           
-                          {/* Variants Row */}
+                          {/* Variations Row */}
                           <AnimatePresence>
-                            {hasVariants && isExpanded && (
+                            {hasVariations && isExpanded && (
                               <motion.tr
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
                                 exit={{ opacity: 0, height: 0 }}
                                 className="bg-muted/20"
                               >
-                                <td colSpan={8} className="p-0">
+                                <td colSpan={9} className="p-0">
                                   <div className="pr-8 py-2">
-                                    {product.variants?.map(variant => (
+                                    {product.variations?.map(variation => (
                                       <motion.div 
-                                        key={variant.id}
+                                        key={variation.id}
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 mb-2"
                                       >
-                                        <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
-                                          <Package className="h-4 w-4 text-muted-foreground" />
+                                        <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded flex items-center justify-center">
+                                          <Tag className="h-4 w-4 text-emerald-600" />
                                         </div>
                                         <div className="flex-1">
-                                          <p className="text-sm font-medium">{variant.name}</p>
-                                          {variant.attributes && <p className="text-xs text-muted-foreground">{variant.attributes}</p>}
+                                          <p className="text-sm font-medium">
+                                            {variation.name || 'سعر إضافي'}
+                                          </p>
                                         </div>
-                                        <code className="text-xs bg-muted px-2 py-1 rounded">{variant.barcode}</code>
-                                        <span className="text-sm">{formatCurrency(variant.costPrice, currency)}</span>
-                                        <span className="text-sm font-medium">{formatCurrency(variant.sellingPrice, currency)}</span>
-                                        <Badge variant="outline">مخزون: {variant.stock}</Badge>
+                                        <code className="text-xs bg-muted px-2 py-1 rounded">{variation.barcode}</code>
+                                        <span className="text-sm font-medium text-emerald-600">{formatCurrency(variation.price, currency)}</span>
+                                        {variation.isStockTracked ? (
+                                          <Badge variant="outline">مخزون: {variation.stock}</Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-600">مفتوح</Badge>
+                                        )}
                                       </motion.div>
                                     ))}
                                   </div>
@@ -377,16 +419,31 @@ export function ProductsPage() {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="basic">معلومات أساسية</TabsTrigger>
               <TabsTrigger value="pricing">التسعير والمخزون</TabsTrigger>
-              <TabsTrigger value="variants">المتغيرات</TabsTrigger>
+              <TabsTrigger value="variations">متغيرات الأسعار</TabsTrigger>
             </TabsList>
 
             <ScrollArea className="h-[55vh]">
               <TabsContent value="basic" className="space-y-4 p-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div><Label>اسم المنتج (عربي) *</Label><Input placeholder="اسم المنتج بالعربية" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} /></div>
-                  <div><Label>اسم المنتج (إنجليزي)</Label><Input placeholder="Product Name" value={formData.nameAr} onChange={(e) => setFormData(prev => ({ ...prev, nameAr: e.target.value }))} /></div>
-                  <div><Label>الباركود *</Label><Input placeholder="أدخل الباركود" value={formData.barcode} onChange={(e) => setFormData(prev => ({ ...prev, barcode: e.target.value }))} /></div>
-                  <div><Label>رمز المنتج (SKU)</Label><Input placeholder="SKU-001" value={formData.sku} onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))} /></div>
+                  <div>
+                    <Label>اسم المنتج (عربي) *</Label>
+                    <Input placeholder="اسم المنتج بالعربية" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>اسم المنتج (إنجليزي)</Label>
+                    <Input placeholder="Product Name" value={formData.nameAr} onChange={(e) => setFormData(prev => ({ ...prev, nameAr: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>الباركود *</Label>
+                    <div className="flex gap-2">
+                      <Input placeholder="أدخل الباركود" value={formData.barcode} onChange={(e) => setFormData(prev => ({ ...prev, barcode: e.target.value }))} />
+                      <Button variant="outline" onClick={generateBarcode}>توليد</Button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>رمز المنتج (SKU)</Label>
+                    <Input placeholder="SKU-001" value={formData.sku} onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))} />
+                  </div>
                   <div>
                     <Label>الفئة</Label>
                     <Select value={formData.categoryId} onValueChange={(v) => setFormData(prev => ({ ...prev, categoryId: v }))}>
@@ -427,61 +484,160 @@ export function ProductsPage() {
                     </Select>
                   </div>
                 </div>
-                <div><Label>الوصف</Label><Textarea placeholder="وصف المنتج..." value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} /></div>
+                <div>
+                  <Label>الوصف</Label>
+                  <Textarea placeholder="وصف المنتج..." value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} />
+                </div>
               </TabsContent>
 
               <TabsContent value="pricing" className="space-y-4 p-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div><Label>سعر التكلفة *</Label><Input type="number" value={formData.costPrice} onChange={(e) => setFormData(prev => ({ ...prev, costPrice: parseFloat(e.target.value) || 0 }))} /></div>
-                  <div><Label>سعر البيع *</Label><Input type="number" value={formData.sellingPrice} onChange={(e) => setFormData(prev => ({ ...prev, sellingPrice: parseFloat(e.target.value) || 0 }))} /></div>
-                  <div><Label>سعر الجملة</Label><Input type="number" value={formData.wholesalePrice} onChange={(e) => setFormData(prev => ({ ...prev, wholesalePrice: parseFloat(e.target.value) || 0 }))} /></div>
-                  <div><Label>الحد الأدنى للمخزون</Label><Input type="number" value={formData.minStock} onChange={(e) => setFormData(prev => ({ ...prev, minStock: parseInt(e.target.value) || 0 }))} /></div>
-                  <div><Label>الحد الأقصى للمخزون</Label><Input type="number" value={formData.maxStock} onChange={(e) => setFormData(prev => ({ ...prev, maxStock: parseInt(e.target.value) || 0 }))} /></div>
+                  <div>
+                    <Label>سعر التكلفة *</Label>
+                    <Input type="number" value={formData.costPrice} onChange={(e) => setFormData(prev => ({ ...prev, costPrice: parseFloat(e.target.value) || 0 }))} />
+                  </div>
+                  <div>
+                    <Label>سعر البيع *</Label>
+                    <Input type="number" value={formData.sellingPrice} onChange={(e) => setFormData(prev => ({ ...prev, sellingPrice: parseFloat(e.target.value) || 0 }))} />
+                  </div>
+                  <div>
+                    <Label>سعر الجملة</Label>
+                    <Input type="number" value={formData.wholesalePrice} onChange={(e) => setFormData(prev => ({ ...prev, wholesalePrice: parseFloat(e.target.value) || 0 }))} />
+                  </div>
+                  <div>
+                    <Label>الحد الأدنى للمخزون</Label>
+                    <Input type="number" value={formData.minStock} onChange={(e) => setFormData(prev => ({ ...prev, minStock: parseInt(e.target.value) || 0 }))} />
+                  </div>
+                  <div>
+                    <Label>الحد الأقصى للمخزون</Label>
+                    <Input type="number" value={formData.maxStock} onChange={(e) => setFormData(prev => ({ ...prev, maxStock: parseInt(e.target.value) || 0 }))} />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* التحكم في المخزون */}
+                <div className="space-y-4">
+                  <Label className="text-base font-semibold">التحكم في المخزون</Label>
+                  <RadioGroup 
+                    value={formData.isStockTracked ? 'tracked' : 'open'} 
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, isStockTracked: v === 'tracked' }))}
+                    className="grid grid-cols-2 gap-4"
+                  >
+                    <div className={cn(
+                      "flex items-start space-x-3 space-y-0 space-reverse p-4 border rounded-lg cursor-pointer transition-all",
+                      formData.isStockTracked ? "border-primary bg-primary/5" : "hover:border-muted-foreground/50"
+                    )}>
+                      <RadioGroupItem value="tracked" id="tracked" className="mt-1" />
+                      <div className="space-y-1 leading-none">
+                        <Label htmlFor="tracked" className="font-medium cursor-pointer">منتج مخزني</Label>
+                        <p className="text-sm text-muted-foreground">يتقيد برصيد المخزن - لا يمكن بيع أكثر من المتوفر</p>
+                      </div>
+                    </div>
+                    <div className={cn(
+                      "flex items-start space-x-3 space-y-0 space-reverse p-4 border rounded-lg cursor-pointer transition-all",
+                      !formData.isStockTracked ? "border-primary bg-primary/5" : "hover:border-muted-foreground/50"
+                    )}>
+                      <RadioGroupItem value="open" id="open" className="mt-1" />
+                      <div className="space-y-1 leading-none">
+                        <Label htmlFor="open" className="font-medium cursor-pointer">منتج غير مخزني</Label>
+                        <p className="text-sm text-muted-foreground">بيع مفتوح - لا يتقيد بالمخزون (خدمات، منتجات رقمية)</p>
+                      </div>
+                    </div>
+                  </RadioGroup>
                 </div>
               </TabsContent>
 
-              <TabsContent value="variants" className="space-y-4 p-4">
-                <div className="flex items-center gap-2">
-                  <Switch checked={formData.hasVariants} onCheckedChange={(v) => setFormData(prev => ({ ...prev, hasVariants: v }))} />
-                  <Label>المنتج له متغيرات (ألوان، أحجام...)</Label>
+              <TabsContent value="variations" className="space-y-4 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label className="text-base font-semibold">متغيرات الأسعار</Label>
+                    <p className="text-sm text-muted-foreground">أضف أسعاراً متعددة للمنتج - كل سعر له باركود مستقل</p>
+                  </div>
+                  <Button variant="outline" onClick={addVariation} className="gap-2">
+                    <Plus className="h-4 w-4" /> إضافة سعر
+                  </Button>
                 </div>
                 <Separator />
-                {formData.hasVariants && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">المتغيرات</h4>
-                      <Button variant="outline" size="sm" onClick={addVariant}><Plus className="h-4 w-4 ml-1" /> إضافة متغير</Button>
-                    </div>
-                    {variants.length > 0 ? (
-                      <div className="space-y-3">
-                        {variants.map((variant, index) => (
-                          <Card key={index}>
-                            <CardContent className="p-3">
-                              <div className="flex items-center justify-between mb-3">
-                                <span className="font-medium text-sm">متغير {index + 1}</span>
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeVariant(index)}><X className="h-4 w-4" /></Button>
-                              </div>
-                              <div className="grid grid-cols-4 gap-2">
-                                <Input placeholder="الاسم" value={variant.name} onChange={(e) => updateVariant(index, 'name', e.target.value)} />
-                                <Input placeholder="الاسم عربي" value={variant.nameAr} onChange={(e) => updateVariant(index, 'nameAr', e.target.value)} />
-                                <Input placeholder="الباركود" value={variant.barcode} onChange={(e) => updateVariant(index, 'barcode', e.target.value)} />
-                                <Input placeholder="SKU" value={variant.sku} onChange={(e) => updateVariant(index, 'sku', e.target.value)} />
-                                <Input type="number" placeholder="سعر التكلفة" value={variant.costPrice} onChange={(e) => updateVariant(index, 'costPrice', parseFloat(e.target.value) || 0)} />
-                                <Input type="number" placeholder="سعر البيع" value={variant.sellingPrice} onChange={(e) => updateVariant(index, 'sellingPrice', parseFloat(e.target.value) || 0)} />
-                                <Input type="number" placeholder="المخزون" value={variant.stock} onChange={(e) => updateVariant(index, 'stock', parseInt(e.target.value) || 0)} />
-                                <Input placeholder="الخصائص (JSON)" value={variant.attributes} onChange={(e) => updateVariant(index, 'attributes', e.target.value)} />
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p>لم يتم إضافة متغيرات بعد</p>
-                        <Button variant="outline" className="mt-4" onClick={addVariant}>إضافة متغير</Button>
-                      </div>
-                    )}
+                
+                {variations.length > 0 ? (
+                  <div className="space-y-3">
+                    {variations.map((variation, index) => (
+                      <Card key={index} className="overflow-hidden">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="font-medium text-sm flex items-center gap-2">
+                              <Tag className="h-4 w-4 text-emerald-600" />
+                              السعر {index + 1}
+                            </span>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeVariation(index)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div>
+                              <Label className="text-xs">السعر (جنيه) *</Label>
+                              <Input 
+                                type="number" 
+                                placeholder="السعر" 
+                                value={variation.price} 
+                                onChange={(e) => updateVariation(index, 'price', parseFloat(e.target.value) || 0)} 
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">اسم تقريبي (اختياري)</Label>
+                              <Input 
+                                placeholder="مثال: سعر الجملة" 
+                                value={variation.name || ''} 
+                                onChange={(e) => updateVariation(index, 'name', e.target.value)} 
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">الباركود</Label>
+                              <Input 
+                                placeholder="BAR-001-1" 
+                                value={variation.barcode} 
+                                onChange={(e) => updateVariation(index, 'barcode', e.target.value)} 
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">المخزون</Label>
+                              <Input 
+                                type="number" 
+                                placeholder="0" 
+                                value={variation.stock} 
+                                onChange={(e) => updateVariation(index, 'stock', parseInt(e.target.value) || 0)}
+                                disabled={!variation.isStockTracked}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                            <Switch 
+                              checked={variation.isStockTracked} 
+                              onCheckedChange={(checked) => updateVariation(index, 'isStockTracked', checked)} 
+                            />
+                            <Label className="text-sm cursor-pointer">
+                              {variation.isStockTracked ? 'تتبع المخزون' : 'بيع مفتوح (بدون تتبع)'}
+                            </Label>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Tag className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>لم يتم إضافة متغيرات أسعار</p>
+                    <p className="text-sm mt-1">أضف أسعاراً متعددة للمنتج (سعر الجملة، عرض خاص، إلخ)</p>
+                    <Button variant="outline" className="mt-4 gap-2" onClick={addVariation}>
+                      <Plus className="h-4 w-4" /> إضافة سعر
+                    </Button>
+                  </div>
+                )}
+
+                {variations.length > 0 && (
+                  <div className="bg-muted/50 p-3 rounded-lg text-sm text-muted-foreground">
+                    <strong>ملاحظة:</strong> عند إضافة متغيرات أسعار، سيُطلب من الكاتب في نقطة البيع اختيار السعر المناسب عند بيع المنتج.
                   </div>
                 )}
               </TabsContent>
@@ -490,7 +646,7 @@ export function ProductsPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>إلغاء</Button>
-            <Button onClick={handleSave} className="gap-2">
+            <Button onClick={handleSave} className="gap-2" disabled={!formData.name || !formData.barcode}>
               <Sparkles className="h-4 w-4" />
               حفظ المنتج
             </Button>
