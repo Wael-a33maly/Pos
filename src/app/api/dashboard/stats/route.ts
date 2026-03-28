@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-// Dashboard Stats API - Updated to fix inventory query
+// Dashboard Stats API - Enhanced with branch sales cards
 
 // Types
 interface KPIStats {
@@ -52,10 +52,33 @@ interface TopProduct {
 interface BranchPerformance {
   id: string;
   name: string;
+  nameAr: string | null;
   sales: number;
   profit: number;
   invoices: number;
   growth: number;
+}
+
+interface ShiftUserSales {
+  shiftId: string;
+  userId: string;
+  userName: string;
+  userAvatar: string | null;
+  openedAt: string;
+  sales: number;
+  invoices: number;
+  profit: number;
+}
+
+interface BranchSalesCard {
+  id: string;
+  name: string;
+  nameAr: string | null;
+  totalSales: number;
+  totalInvoices: number;
+  totalProfit: number;
+  activeShifts: number;
+  users: ShiftUserSales[];
 }
 
 interface DashboardResponse {
@@ -65,6 +88,7 @@ interface DashboardResponse {
   dailySales: DailySales[];
   topProducts: TopProduct[];
   branchPerformance: BranchPerformance[];
+  branchSalesCards: BranchSalesCard[];
   recentInvoices: any[];
   lowStockAlert: any[];
 }
@@ -343,12 +367,86 @@ export async function GET(request: NextRequest): Promise<NextResponse<DashboardR
       return {
         id: branch.id,
         name: branch.name,
+        nameAr: branch.nameAr,
         sales,
         profit,
         invoices,
-        growth: 0, // Would need historical data to calculate
+        growth: 0,
       };
     }).sort((a, b) => b.sales - a.sales);
+
+    // ===== Branch Sales Cards (with open shifts) =====
+    const openShifts = await db.shift.findMany({
+      where: { 
+        status: 'OPEN',
+        ...branchFilter,
+      },
+      include: {
+        user: { select: { id: true, name: true, avatar: true } },
+        branch: { select: { id: true, name: true, nameAr: true } },
+        invoices: {
+          where: {
+            createdAt: { gte: todayStart, lte: todayEnd },
+            status: 'COMPLETED',
+            isReturn: false,
+          },
+          include: { items: true },
+        },
+      },
+    });
+
+    // Group shifts by branch
+    const branchShiftsMap = new Map<string, {
+      branch: { id: string; name: string; nameAr: string | null };
+      shifts: typeof openShifts;
+    }>();
+
+    openShifts.forEach(shift => {
+      if (!branchShiftsMap.has(shift.branchId)) {
+        branchShiftsMap.set(shift.branchId, {
+          branch: shift.branch,
+          shifts: [],
+        });
+      }
+      branchShiftsMap.get(shift.branchId)!.shifts.push(shift);
+    });
+
+    // Build branch sales cards
+    const branchSalesCards: BranchSalesCard[] = Array.from(branchShiftsMap.values()).map(({ branch, shifts }) => {
+      const users: ShiftUserSales[] = shifts.map(shift => {
+        const sales = shift.invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+        const invoices = shift.invoices.length;
+        const profit = shift.invoices.reduce((sum, inv) =>
+          sum + inv.items.reduce((itemSum, item) => itemSum + ((item.unitPrice - item.costPrice) * item.quantity), 0)
+        , 0);
+        
+        return {
+          shiftId: shift.id,
+          userId: shift.userId,
+          userName: shift.user?.name || 'غير معروف',
+          userAvatar: shift.user?.avatar || null,
+          openedAt: shift.startTime?.toISOString() || shift.createdAt.toISOString(),
+          sales,
+          invoices,
+          profit,
+        };
+      });
+
+      const totalSales = users.reduce((sum, u) => sum + u.sales, 0);
+      const totalInvoices = users.reduce((sum, u) => sum + u.invoices, 0);
+      const totalProfit = users.reduce((sum, u) => sum + u.profit, 0);
+
+      return {
+        id: branch.id,
+        name: branch.name,
+        nameAr: branch.nameAr,
+        totalSales,
+        totalInvoices,
+        totalProfit,
+        activeShifts: shifts.length,
+        users,
+      };
+    }).sort((a, b) => b.totalSales - a.totalSales);
 
     // ===== Recent Invoices =====
     const recentInvoices = await db.invoice.findMany({
@@ -365,8 +463,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<DashboardR
       take: 10,
     });
 
-    // ===== Low Stock Alert - Fixed Query =====
-    // Get products with their inventory and check if quantity <= minStock
+    // ===== Low Stock Alert =====
     const lowStockRecords = await db.inventory.findMany({
       where: { quantity: { lte: 0 } },
       include: {
@@ -403,6 +500,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<DashboardR
       dailySales,
       topProducts,
       branchPerformance,
+      branchSalesCards,
       recentInvoices,
       lowStockAlert,
     };

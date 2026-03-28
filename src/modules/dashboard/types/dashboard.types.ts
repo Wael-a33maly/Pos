@@ -54,10 +54,37 @@ export interface TopProduct {
 export interface BranchPerformance {
   id: string;
   name: string;
+  nameAr: string | null;
   sales: number;
   profit: number;
   invoices: number;
   growth: number;
+}
+
+// ============================================
+// Branch Sales Card - كارت مبيعات الفرع
+// ============================================
+
+export interface ShiftUserSales {
+  shiftId: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string | null;
+  openedAt: string;
+  sales: number;
+  invoices: number;
+  profit: number;
+}
+
+export interface BranchSalesCard {
+  id: string;
+  name: string;
+  nameAr: string | null;
+  totalSales: number;
+  totalInvoices: number;
+  totalProfit: number;
+  activeShifts: number;
+  users: ShiftUserSales[];
 }
 
 export interface DashboardData {
@@ -67,6 +94,7 @@ export interface DashboardData {
   dailySales: DailySales[];
   topProducts: TopProduct[];
   branchPerformance: BranchPerformance[];
+  branchSalesCards: BranchSalesCard[];
   recentInvoices: RecentInvoice[];
   lowStockAlert: LowStockProduct[];
 }
@@ -126,6 +154,12 @@ export interface QuickActionButtonProps {
   label: string;
   onClick?: () => void;
   color: string;
+}
+
+export interface BranchSalesCardProps {
+  branch: BranchSalesCard;
+  currency: CurrencySettings;
+  index: number;
 }
 
 // ============================================
