@@ -82,7 +82,7 @@ export function PurchasesPage() {
 
   // Form state
   const [formData, setFormData] = useState<PurchaseOrderFormData>({
-    supplierId: '',
+    supplierId: 'none',
     notes: '',
     items: []
   });
@@ -90,7 +90,7 @@ export function PurchasesPage() {
   // Suppliers and products
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState('none');
   const [selectedQty, setSelectedQty] = useState(1);
   const [selectedCost, setSelectedCost] = useState(0);
 
@@ -130,7 +130,7 @@ export function PurchasesPage() {
   };
 
   const handleCreate = async () => {
-    if (!formData.supplierId) {
+    if (!formData.supplierId || formData.supplierId === 'none') {
       toast.error('اختر المورد');
       return;
     }
@@ -143,12 +143,12 @@ export function PurchasesPage() {
     
     if (success) {
       setShowCreateDialog(false);
-      setFormData({ supplierId: '', notes: '', items: [] });
+      setFormData({ supplierId: 'none', notes: '', items: [] });
     }
   };
 
   const handleAddItem = () => {
-    if (!selectedProduct) return;
+    if (!selectedProduct || selectedProduct === 'none') return;
     
     const product = products.find(p => p.id === selectedProduct);
     if (!product) return;
@@ -171,7 +171,7 @@ export function PurchasesPage() {
       }));
     }
     
-    setSelectedProduct('');
+    setSelectedProduct('none');
     setSelectedQty(1);
     setSelectedCost(0);
   };
@@ -582,6 +582,7 @@ export function PurchasesPage() {
                     <SelectValue placeholder="اختر المورد" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">اختر المورد</SelectItem>
                     {suppliers.map(s => (
                       <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                     ))}
@@ -598,6 +599,10 @@ export function PurchasesPage() {
                   <div className="col-span-5">
                     <Select value={selectedProduct} onValueChange={(v) => {
                       setSelectedProduct(v);
+                      if (v === 'none') {
+                        setSelectedCost(0);
+                        return;
+                      }
                       const product = products.find(p => p.id === v);
                       if (product) setSelectedCost(product.costPrice);
                     }}>
@@ -605,6 +610,7 @@ export function PurchasesPage() {
                         <SelectValue placeholder="اختر المنتج" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none">اختر المنتج</SelectItem>
                         {products.map(p => (
                           <SelectItem key={p.id} value={p.id}>{p.name} ({p.barcode})</SelectItem>
                         ))}
