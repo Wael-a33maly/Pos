@@ -1,14 +1,18 @@
 import { PrismaClient } from '@prisma/client'
 
+// Force rebuild after Prisma client regeneration - v4
+
+// إنشاء عميل Prisma جديد في كل مرة في بيئة التطوير
+const createPrismaClient = () => {
+  return new PrismaClient({
+    log: ['query'],
+  })
+}
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// Force rebuild after Prisma client regeneration - v2
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['query'],
-  })
+export const db = globalForPrisma.prisma ?? createPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db

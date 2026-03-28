@@ -3,6 +3,9 @@ import type { User } from '@/types';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 
+// Auth helper - returns current user
+export const auth = getCurrentUser;
+
 // Simple password hashing (in production, use bcrypt)
 export function hashPassword(password: string): string {
   // In production, use bcrypt or similar

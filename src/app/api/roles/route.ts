@@ -9,9 +9,6 @@ export async function GET(request: NextRequest) {
 
     const roles = await db.role.findMany({
       include: {
-        users: {
-          select: { id: true, name: true, email: true }
-        },
         permissions: includePermissions ? {
           include: {
             permission: true

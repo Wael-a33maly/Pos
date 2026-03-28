@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
           }
         },
         usages: {
-          select: { id: true, discountAmount, createdAt },
+          select: { id: true, discountAmount: true, createdAt: true },
           take: 10,
           orderBy: { createdAt: 'desc' }
         },

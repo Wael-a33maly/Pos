@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
           isActive: true 
         },
         include: {
-          variations: true
+          // variations معطل مؤقتاً
         }
       });
     } else {
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
           ]
         },
         include: {
-          variations: true
+          // variations معطل مؤقتاً
         }
       });
     }

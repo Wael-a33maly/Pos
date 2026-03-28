@@ -34,10 +34,7 @@ export async function GET(request: NextRequest) {
           brand: true,
           supplier: true,
           variants: { where: { isActive: true } },
-          variations: { 
-            where: { isActive: true },
-            orderBy: { sortOrder: 'asc' }
-          },
+          // variations معطل مؤقتاً - يحتاج إعادة توليد Prisma client
           inventory: branchId ? { where: { branchId } } : true,
         },
         skip,
